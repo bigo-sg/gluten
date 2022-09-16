@@ -143,6 +143,9 @@ object ConverterUtils extends Logging {
         TypeBuilder.makeDecimal(nullable, precision, scale)
       case TimestampType =>
         TypeBuilder.makeTimestamp(nullable)
+      case m: MapType =>
+        TypeBuilder.makeMap(m.valueContainsNull, getTypeNode(m.keyType, false),
+          getTypeNode(m.valueType, false))
       case unknown =>
         throw new UnsupportedOperationException(s"Type $unknown not supported.")
     }
