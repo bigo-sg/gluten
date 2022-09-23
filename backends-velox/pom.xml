@@ -32,35 +32,12 @@
         <velox.build_velox>${build_velox}</velox.build_velox>
         <velox.build_velox_from_source>${build_velox_from_source}</velox.build_velox_from_source>
         <velox.compile_velox>${compile_velox}</velox.compile_velox>
+        <velox.enable_ep_cache>${enable_ep_cache}</velox.enable_ep_cache>
         <velox.velox_home>${velox_home}</velox.velox_home>
         <velox.velox_build_type>${velox_build_type}</velox.velox_build_type>
         <velox.debug_build>${debug_build}</velox.debug_build>
+        <velox.backend_type>${backend_type}</velox.backend_type>
     </properties>
-
-    <profiles>
-       <profile>
-	  <id>backends-gazelle</id>
-          <dependencies>
-           <dependency>
-              <groupId>org.apache.arrow</groupId>
-              <artifactId>arrow-dataset</artifactId>
-              <version>${arrow.version}</version>
-            </dependency>
-	  </dependencies>
-       </profile>
-
-        <profile>
-            <id>backends-velox</id>
-            <dependencies>
-                <dependency>
-                    <groupId>org.apache.arrow</groupId>
-                    <artifactId>arrow-dataset</artifactId>
-                    <version>${arrow.version}</version>
-                    <scope>provided</scope>
-                </dependency>
-            </dependencies>
-        </profile>
-    </profiles>
 
     <dependencies>
         <dependency>
@@ -76,11 +53,6 @@
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-catalyst_${scala.binary.version}</artifactId>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-sql_${scala.binary.version}</artifactId>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -217,7 +189,6 @@
             </exclusions>
             <!--scope>provided</scope-->
         </dependency>
-
         <dependency>
             <groupId>org.apache.arrow.gandiva</groupId>
             <artifactId>arrow-gandiva</artifactId>
@@ -304,6 +275,9 @@
                                 <argument>
                                     --compile_velox=${velox.compile_velox}
                                 </argument>
+                                <argument>
+                                    --enable_ep_cache=${velox.enable_ep_cache}
+                                </argument>
                                 <argument>${velox.velox_home}</argument>
                             </arguments>
                         </configuration>
@@ -332,6 +306,7 @@
                                 <argument>${velox.velox_build_type}</argument>
                                 <argument>${velox.debug_build}</argument>
                                 <argument>${velox.cpp_benchmarks}</argument>
+                                <argument>${velox.backend_type}</argument>
                             </arguments>
                         </configuration>
                     </execution>
@@ -432,7 +407,7 @@
                 <artifactId>maven-checkstyle-plugin</artifactId>
                 <version>3.1.1</version>
                 <configuration>
-                    <failOnViolation>false</failOnViolation>
+                    <failOnViolation>true</failOnViolation>
                     <includeTestSourceDirectory>true</includeTestSourceDirectory>
                     <sourceDirectories>
                         <directory>${project.basedir}/src/main/java</directory>
