@@ -144,8 +144,15 @@ object ConverterUtils extends Logging {
       case TimestampType =>
         TypeBuilder.makeTimestamp(nullable)
       case m: MapType =>
-        TypeBuilder.makeMap(m.valueContainsNull, getTypeNode(m.keyType, false),
-          getTypeNode(m.valueType, false))
+        TypeBuilder.makeMap(nullable, getTypeNode(m.keyType, false), getTypeNode(m.valueType, m.valueContainsNull))
+      case a: ArrayType =>
+        TypeBuilder.makeList(nullable, getTypeNode(a.elementType, a.containsNull))
+      case s: StructType =>
+        val fieldNodes = new java.util.ArrayList[TypeNode]
+        for (structField <- s.fields) {
+          fieldNodes.add(getTypeNode(structField.dataType, structField.nullable))
+        }
+        TypeBuilder.makeStruct(nullable, fieldNodes)
       case unknown =>
         throw new UnsupportedOperationException(s"Type $unknown not supported.")
     }

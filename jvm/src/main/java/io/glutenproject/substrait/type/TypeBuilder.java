@@ -31,10 +31,6 @@ public class TypeBuilder {
 		return new BooleanTypeNode(nullable);
 	}
 
-	public static TypeNode makeStruct(ArrayList<TypeNode> types) {
-		return new StructNode(types);
-	}
-
 	public static TypeNode makeString(Boolean nullable) {
 		return new StringTypeNode(nullable);
 	}
@@ -59,7 +55,15 @@ public class TypeBuilder {
 		return new TimestampTypeNode(nullable);
 	}
 
+	public static TypeNode makeStruct(Boolean nullable, ArrayList<TypeNode> types) {
+		return new StructNode(nullable, types);
+	}
+
 	public static TypeNode makeMap(Boolean nullable, TypeNode keyType, TypeNode valType) {
 		return new MapNode(nullable, keyType, valType);
+	}
+
+	public static TypeNode makeList(Boolean nullable, TypeNode nestedType) {
+		return new ListNode(nullable, nestedType);
 	}
 }
