@@ -976,7 +976,7 @@ trait HashJoinLikeExecTransformer
     val inputTypeNodes = output.map { attr =>
       ConverterUtils.getTypeNode(attr.dataType, attr.nullable)
     }
-    Any.pack(TypeBuilder.makeStruct(
+    Any.pack(TypeBuilder.makeStruct(false,
       new util.ArrayList[TypeNode](inputTypeNodes.asJava)).toProtobuf)
   }
 
