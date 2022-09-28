@@ -144,7 +144,8 @@ object ConverterUtils extends Logging {
       case TimestampType =>
         TypeBuilder.makeTimestamp(nullable)
       case m: MapType =>
-        TypeBuilder.makeMap(nullable, getTypeNode(m.keyType, false), getTypeNode(m.valueType, m.valueContainsNull))
+        TypeBuilder.makeMap(nullable, getTypeNode(m.keyType, false),
+          getTypeNode(m.valueType, m.valueContainsNull))
       case a: ArrayType =>
         TypeBuilder.makeList(nullable, getTypeNode(a.elementType, a.containsNull))
       case s: StructType =>
