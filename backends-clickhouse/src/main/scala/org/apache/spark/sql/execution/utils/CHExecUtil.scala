@@ -44,7 +44,8 @@ import org.apache.spark.sql.vectorized.ColumnarBatch
 
 object CHExecUtil {
 
-  def inferSparkDataType(typeName: String): DataType = typeName match {
+  def inferSparkDataType(substraitType: Array[Byte]): DataType = substraitType match {
+    /// TODO(taiyang-li)
     case "Date" => DateType
     case "Float" => FloatType
     case "Double" => DoubleType

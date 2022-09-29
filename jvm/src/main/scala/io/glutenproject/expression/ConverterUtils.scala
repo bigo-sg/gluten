@@ -20,6 +20,7 @@ package io.glutenproject.expression
 import io.glutenproject.execution.{BasicScanExecTransformer, BatchScanExecTransformer, FileSourceScanExecTransformer}
 import io.glutenproject.substrait.`type`._
 import io.glutenproject.substrait.rel.LocalFilesNode.ReadFileFormat
+import io.substrait.proto.Type;
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
@@ -27,6 +28,8 @@ import org.apache.spark.sql.catalyst.optimizer._
 import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType, LeftAnti, LeftOuter, LeftSemi, RightOuter}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.vectorized.ColumnarBatch
+import org.apache.parquet.format.IntType
+import io.substrait.proto.AdvancedExtension.parseFrom
 
 object ConverterUtils extends Logging {
 
@@ -122,8 +125,61 @@ object ConverterUtils extends Logging {
     }
   }
 
-  def getTypeNode(datatye: DataType, nullable: Boolean): TypeNode = {
-    datatye match {
+  def isNullable(nullability: Type.Nullability): Boolean = {
+    return nullability == Type.Nullability.NULLABILITY_NULLABLE
+  }
+
+  def parseFromSubstraitType(substraitType: Type): (DataType, Boolean) = {
+    substraitType.getKindCase match {
+      case Type.KindCase.BOOL =>
+        (BooleanType, isNullable(substraitType.getBool.getNullability))
+      case Type.KindCase.I8 =>
+        (ByteType, substraitType.getI8.getNullability == Type.Nullability.NULLABILITY_NULLABLE)
+      case Type.KindCase.I16 =>
+        (ShortType, isNullable(substraitType.getI16.getNullability)) 
+      case Type.KindCase.I32 =>
+        (IntegerType, isNullable(substraitType.getI32.getNullability)) 
+      case Type.KindCase.I64 =>
+        (LongType, isNullable(substraitType.getI64.getNullability))
+      case Type.KindCase.FP32 =>
+        (FloatType, isNullable(substraitType.getFp32.getNullability))
+      case Type.KindCase.FP64 =>
+        (DoubleType, isNullable(substraitType.getFp64.getNullability))
+      case Type.KindCase.STRING =>
+        (StringType, isNullable(substraitType.getString.getNullability))
+      case Type.KindCase.BINARY => 
+        (BinaryType, isNullable(substraitType.getBinary.getNullability))
+      case Type.KindCase.TIMESTAMP =>
+        (TimestampType, isNullable(substraitType.getTimestamp.getNullability))
+      case Type.KindCase.DATE =>
+        (DateType, isNullable(substraitType.getDate.getNullability))
+      case Type.KindCase.DECIMAL =>
+        val decimal = substraitType.getDecimal
+        val precision = decimal.getPrecision
+        val scale = decimal.getScale
+        (DecimalType(precision, scale), isNullable(decimal.getNullability))
+      case Type.KindCase.STRUCT =>
+        val struct = substraitType.getStruct
+        val fields = new java.util.ArrayList[StructField]
+        struct.getTypesList.forEach(fieldType => {
+          val (field, nullable) = parseFromSubstraitType(fieldType)
+          fields.add(StructField("", field, nullable))
+        })
+        
+      case Type.KindCase.LIST =>
+        val list = substraitType.getList
+        val (elementType, containsNull) = parseFromSubstraitType(list.getType)
+        (ArrayType(elementType, containsNull), false)
+      case Type.KindCase.MAP =>
+        val map = substraitType.getMap
+        val (keyType, _) = parseFromSubstraitType(map.getKey)
+        val (valueType, valueContainsNull) = parseFromSubstraitType(map.getValue())
+        (MapType(keyType, valueType, valueContainsNull), false)
+    }
+  }
+
+  def getTypeNode(datatype: DataType, nullable: Boolean): TypeNode = {
+    datatype match {
       case BooleanType =>
         TypeBuilder.makeBoolean(nullable)
       case DoubleType =>
@@ -137,7 +193,7 @@ object ConverterUtils extends Logging {
       case DateType =>
         TypeBuilder.makeDate(nullable)
       case DecimalType() =>
-        val decimalType = datatye.asInstanceOf[DecimalType]
+        val decimalType = datatype.asInstanceOf[DecimalType]
         val precision = decimalType.precision
         val scale = decimalType.scale
         TypeBuilder.makeDecimal(nullable, precision, scale)

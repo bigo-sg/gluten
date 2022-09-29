@@ -24,67 +24,66 @@ import org.apache.spark.sql.vectorized.ColumnarBatch;
 import java.util.Optional;
 
 public class CHNativeBlock {
-  private long blockAddress;
+	private long blockAddress;
 
-  public CHNativeBlock(long blockAddress) {
-    this.blockAddress = blockAddress;
-  }
+	public CHNativeBlock(long blockAddress) {
+		this.blockAddress = blockAddress;
+	}
 
-  public static Optional<CHNativeBlock> fromColumnarBatch(ColumnarBatch batch) {
-    if (batch.numCols() == 0 || !(batch.column(0) instanceof CHColumnVector)) {
-      return Optional.empty();
-    }
-    CHColumnVector columnVector = (CHColumnVector) batch.column(0);
-    return Optional.of(new CHNativeBlock(columnVector.getBlockAddress()));
-  }
+	public static Optional<CHNativeBlock> fromColumnarBatch(ColumnarBatch batch) {
+		if (batch.numCols() == 0 || !(batch.column(0) instanceof CHColumnVector)) {
+			return Optional.empty();
+		}
+		CHColumnVector columnVector = (CHColumnVector) batch.column(0);
+		return Optional.of(new CHNativeBlock(columnVector.getBlockAddress()));
+	}
 
-  private native int nativeNumRows(long blockAddress);
+	private native int nativeNumRows(long blockAddress);
 
-  public int numRows() {
-    return nativeNumRows(blockAddress);
-  }
+	public int numRows() {
+		return nativeNumRows(blockAddress);
+	}
 
-  public long blockAddress() {
-    return blockAddress;
-  }
+	public long blockAddress() {
+		return blockAddress;
+	}
 
-  private native int nativeNumColumns(long blockAddress);
+	private native int nativeNumColumns(long blockAddress);
 
-  public int numColumns() {
-    return nativeNumColumns(blockAddress);
-  }
+	public int numColumns() {
+		return nativeNumColumns(blockAddress);
+	}
 
-  private native String nativeColumnType(long blockAddress, int position);
+	private native byte[] nativeColumnType(long blockAddress, int position);
 
-  public String getTypeByPosition(int position) {
-    return nativeColumnType(blockAddress, position);
-  }
+	public byte[] getTypeByPosition(int position) {
+		return nativeColumnType(blockAddress, position);
+	}
 
-  private native long nativeTotalBytes(long blockAddress);
+	private native long nativeTotalBytes(long blockAddress);
 
-  public long totalBytes() {
-    return nativeTotalBytes(blockAddress);
-  }
+	public long totalBytes() {
+		return nativeTotalBytes(blockAddress);
+	}
 
-  public native void nativeClose(long blockAddress);
+	public native void nativeClose(long blockAddress);
 
-  public void close() {
-    if (blockAddress != 0) {
-      nativeClose(blockAddress);
-      blockAddress = 0;
-    }
-  }
+	public void close() {
+		if (blockAddress != 0) {
+			nativeClose(blockAddress);
+			blockAddress = 0;
+		}
+	}
 
-  public ColumnarBatch toColumnarBatch() {
-    ColumnVector[] vectors = new ColumnVector[numColumns()];
-    for (int i = 0; i < numColumns(); i++) {
-      vectors[i] = new CHColumnVector(CHExecUtil.inferSparkDataType(getTypeByPosition(i)),
-          blockAddress, i);
-    }
-    int numRows = 0;
-    if (numColumns() != 0) {
-      numRows = numRows();
-    }
-    return new ColumnarBatch(vectors, numRows);
-  }
+	public ColumnarBatch toColumnarBatch() {
+		ColumnVector[] vectors = new ColumnVector[numColumns()];
+		for (int i = 0; i < numColumns(); i++) {
+			vectors[i] = new CHColumnVector(CHExecUtil.inferSparkDataType(getTypeByPosition(i)), blockAddress, i);
+		}
+		int numRows = 0;
+		if (numColumns() != 0) {
+			numRows = numRows();
+		}
+		return new ColumnarBatch(vectors, numRows);
+	}
 }
