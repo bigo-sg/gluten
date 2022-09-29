@@ -48,7 +48,7 @@ case class RowToCHNativeColumnarExec(child: SparkPlan)
     // plan (this) in the closure.
     val localSchema = this.schema
     val fieldNames = output.map(ConverterUtils.genColumnNameWithExprId(_)).toArray
-    val fieldTypes = output.map(ConverterUtils.getTypeNode(_.dataType, _.nullable)
+    val fieldTypes = output.map(attr => ConverterUtils.getTypeNode(attr.dataType, attr.nullable)
       .toProtobuf.toByteArray).toArray
     child.execute().mapPartitions { rowIterator =>
       val projection = UnsafeProjection.create(localSchema)
