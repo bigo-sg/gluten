@@ -30,6 +30,7 @@ import org.apache.spark.sql.types._
 import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.parquet.format.IntType
 import io.substrait.proto.AdvancedExtension.parseFrom
+import scala.collection.JavaConverters._
 
 object ConverterUtils extends Logging {
 
@@ -136,9 +137,9 @@ object ConverterUtils extends Logging {
       case Type.KindCase.I8 =>
         (ByteType, substraitType.getI8.getNullability == Type.Nullability.NULLABILITY_NULLABLE)
       case Type.KindCase.I16 =>
-        (ShortType, isNullable(substraitType.getI16.getNullability)) 
+        (ShortType, isNullable(substraitType.getI16.getNullability))
       case Type.KindCase.I32 =>
-        (IntegerType, isNullable(substraitType.getI32.getNullability)) 
+        (IntegerType, isNullable(substraitType.getI32.getNullability))
       case Type.KindCase.I64 =>
         (LongType, isNullable(substraitType.getI64.getNullability))
       case Type.KindCase.FP32 =>
@@ -147,7 +148,7 @@ object ConverterUtils extends Logging {
         (DoubleType, isNullable(substraitType.getFp64.getNullability))
       case Type.KindCase.STRING =>
         (StringType, isNullable(substraitType.getString.getNullability))
-      case Type.KindCase.BINARY => 
+      case Type.KindCase.BINARY =>
         (BinaryType, isNullable(substraitType.getBinary.getNullability))
       case Type.KindCase.TIMESTAMP =>
         (TimestampType, isNullable(substraitType.getTimestamp.getNullability))
@@ -159,13 +160,13 @@ object ConverterUtils extends Logging {
         val scale = decimal.getScale
         (DecimalType(precision, scale), isNullable(decimal.getNullability))
       case Type.KindCase.STRUCT =>
-        val struct = substraitType.getStruct
+        val struct_ = substraitType.getStruct
         val fields = new java.util.ArrayList[StructField]
-        struct.getTypesList.forEach(fieldType => {
-          val (field, nullable) = parseFromSubstraitType(fieldType)
+        for (typ <- struct_.getTypesList.asScala) {
+          val (field, nullable) = parseFromSubstraitType(typ)
           fields.add(StructField("", field, nullable))
-        })
-        
+        }
+        (StructType(fields), false)
       case Type.KindCase.LIST =>
         val list = substraitType.getList
         val (elementType, containsNull) = parseFromSubstraitType(list.getType)
@@ -175,6 +176,8 @@ object ConverterUtils extends Logging {
         val (keyType, _) = parseFromSubstraitType(map.getKey)
         val (valueType, valueContainsNull) = parseFromSubstraitType(map.getValue())
         (MapType(keyType, valueType, valueContainsNull), false)
+      case unsupported =>
+        throw new UnsupportedOperationException(s"Type $unsupported not supported.")
     }
   }
 
