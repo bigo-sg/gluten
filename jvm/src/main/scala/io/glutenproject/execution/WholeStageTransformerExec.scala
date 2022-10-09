@@ -143,15 +143,26 @@ case class WholeStageTransformerExec(child: SparkPlan)(val transformStageId: Int
   @deprecated
   override def doExecute(): RDD[InternalRow] = {
     // check if BatchScan exists
-    val currentOp = checkBatchScanExecTransformerChild()
-    if (currentOp.isDefined) {
-      // If containing scan exec transformer, a new RDD is created.
-      val fileScan = currentOp.get
-      val wsCxt = doWholestageTransform()
+    val basicScanExecTransformer = checkBatchScanExecTransformerChildren()
+    if (basicScanExecTransformer.nonEmpty) {
+      // the partition size of the all BasicScanExecTransformer must be the same
+      val partitionLength = basicScanExecTransformer(0).getPartitions.size
+      if (basicScanExecTransformer.exists(_.getPartitions.length != partitionLength)) {
+        throw new RuntimeException(
+          "The partition length of all the scan transformer are not the same.")
+      }
 
+      // If containing scan exec transformer, a new RDD is created.
       val startTime = System.nanoTime()
-      val substraitPlanPartition = fileScan.getFlattenPartitions.map(p =>
-        BackendsApiManager.getIteratorApiInstance.genNativeFilePartition(-1, null, wsCxt))
+      val wsCxt = doWholestageTransform()
+      // the file format for each scan exec
+      wsCxt.substraitContext.setFileFormat(
+        basicScanExecTransformer.map(ConverterUtils.getFileFormat).asJava)
+      val substraitPlanPartition = (0 until partitionLength).map( i => {
+        val currentPartitions = basicScanExecTransformer.map(_.getPartitions(i))
+        BackendsApiManager.getIteratorApiInstance.genNativeFilePartition(
+          i, currentPartitions, wsCxt)
+      })
       logDebug(
         s"Generated substrait plan tooks: ${(System.nanoTime() - startTime) / 1000000} ms")
 
