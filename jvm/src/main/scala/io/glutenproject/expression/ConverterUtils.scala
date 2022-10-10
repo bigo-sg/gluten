@@ -328,9 +328,9 @@ object ConverterUtils extends Logging {
         case BooleanType =>
           // TODO: Not in Substrait yet.
           typedFuncName.concat("bool")
-        case ByteType => 
+        case ByteType =>
           typedFuncName.concat("i8")
-        case ShortType => 
+        case ShortType =>
           typedFuncName.concat("i8")
         case IntegerType =>
           typedFuncName.concat("i32")
@@ -350,7 +350,7 @@ object ConverterUtils extends Logging {
           typedFuncName.concat("bin")
         case DecimalType() =>
           typedFuncName.concat("dec")
-        case ArrayType(_,_) =>
+        case ArrayType(_, _) =>
           typedFuncName.concat("list")
         case StructType(_) =>
           typedFuncName.concat("struct")

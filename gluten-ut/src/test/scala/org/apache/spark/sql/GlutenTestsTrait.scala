@@ -186,7 +186,6 @@ trait GlutenTestsTrait extends SparkFunSuite with ExpressionEvalHelper with Glut
         case decimal: Decimal =>
           structFileSeq.append(StructField("dec",
             DecimalType(decimal.precision, decimal.scale), decimal == null))
-        /// TODO(taiyang-li) date/timestamp如何表示，map/struct/array如何实现
         /*
         case row: InternalRow =>
           structFileSeq.append(StructField("row",
