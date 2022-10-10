@@ -110,7 +110,6 @@ object InSetOperatorTransformer {
           value =>
             ExpressionBuilder.makeDecimalLiteral(value.asInstanceOf[Decimal])
         }).asJava)
-      /// TODO(taiyang-li) map/array/struct 
       case other =>
         throw new UnsupportedOperationException(s"$other is not supported.")
     }
