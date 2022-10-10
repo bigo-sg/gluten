@@ -15,30 +15,27 @@
  * limitations under the License.
  */
 
-package io.glutenproject.substrait.type;
+package io.glutenproject.substrait.expression;
 
-import io.substrait.proto.Type;
+import io.substrait.proto.Expression;
 
 import java.io.Serializable;
 
-public class StringTypeNode implements TypeNode, Serializable {
-	private final Boolean nullable;
+public class FloatLiteralNode implements ExpressionNode, Serializable {
+  private final Float value;
 
-	StringTypeNode(Boolean nullable) {
-		this.nullable = nullable;
-	}
+  public FloatLiteralNode(Float value) {
+    this.value = value;
+  }
 
-	@Override
-	public Type toProtobuf() {
-		Type.String.Builder stringBuilder = Type.String.newBuilder();
-		if (nullable) {
-			stringBuilder.setNullability(Type.Nullability.NULLABILITY_NULLABLE);
-		} else {
-			stringBuilder.setNullability(Type.Nullability.NULLABILITY_REQUIRED);
-		}
+  @Override
+  public Expression toProtobuf() {
+    Expression.Literal.Builder floatBuilder =
+        Expression.Literal.newBuilder();
+    floatBuilder.setFp32(value);
 
-		Type.Builder builder = Type.newBuilder();
-		builder.setString(stringBuilder.build());
-		return builder.build();
-	}
+    Expression.Builder builder = Expression.newBuilder();
+    builder.setLiteral(floatBuilder.build());
+    return builder.build();
+  }
 }

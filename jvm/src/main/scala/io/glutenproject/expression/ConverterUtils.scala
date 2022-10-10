@@ -185,14 +185,22 @@ object ConverterUtils extends Logging {
     datatype match {
       case BooleanType =>
         TypeBuilder.makeBoolean(nullable)
+      case FloatType =>
+        TypeBuilder.makeFP32(nullable)
       case DoubleType =>
         TypeBuilder.makeFP64(nullable)
-      case StringType =>
-        TypeBuilder.makeString(nullable)
-      case LongType =>
+            case LongType =>
         TypeBuilder.makeI64(nullable)
       case IntegerType =>
         TypeBuilder.makeI32(nullable)
+      case ShortType =>
+        TypeBuilder.makeI16(nullable)
+      case ByteType =>
+        TypeBuilder.makeI8(nullable)
+      case StringType =>
+        TypeBuilder.makeString(nullable)
+      case BinaryType =>
+        TypeBuilder.makeBinary(nullable)
       case DateType =>
         TypeBuilder.makeDate(nullable)
       case DecimalType() =>
@@ -320,18 +328,34 @@ object ConverterUtils extends Logging {
         case BooleanType =>
           // TODO: Not in Substrait yet.
           typedFuncName.concat("bool")
+        case ByteType => 
+          typedFuncName.concat("i8")
+        case ShortType => 
+          typedFuncName.concat("i8")
         case IntegerType =>
           typedFuncName.concat("i32")
         case LongType =>
           typedFuncName.concat("i64")
+        case FloatType =>
+          typedFuncName.concat("fp32")
         case DoubleType =>
           typedFuncName.concat("fp64")
         case DateType =>
           typedFuncName.concat("date")
+        case TimestampType =>
+          typedFuncName.concat("ts")
         case StringType =>
           typedFuncName.concat("str")
+        case BinaryType =>
+          typedFuncName.concat("bin")
         case DecimalType() =>
           typedFuncName.concat("dec")
+        case ArrayType(_,_) =>
+          typedFuncName.concat("list")
+        case StructType(_) =>
+          typedFuncName.concat("struct")
+        case MapType(_, _, _) =>
+          typedFuncName.concat("map")
         case other =>
           throw new UnsupportedOperationException(s"Type $other not supported.")
       }

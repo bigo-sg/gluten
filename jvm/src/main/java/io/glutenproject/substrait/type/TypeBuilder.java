@@ -20,50 +20,66 @@ package io.glutenproject.substrait.type;
 import java.util.ArrayList;
 
 public class TypeBuilder {
-  private TypeBuilder() {
-  }
+	private TypeBuilder() {
+	}
 
-  public static TypeNode makeFP64(Boolean nullable) {
-    return new FP64TypeNode(nullable);
-  }
+	public static TypeNode makeFP32(Boolean nullable) {
+		return new FP32TypeNode(nullable);
+	}
 
-  public static TypeNode makeBoolean(Boolean nullable) {
-    return new BooleanTypeNode(nullable);
-  }
+	public static TypeNode makeFP64(Boolean nullable) {
+		return new FP64TypeNode(nullable);
+	}
 
-  public static TypeNode makeString(Boolean nullable) {
-    return new StringTypeNode(nullable);
-  }
+	public static TypeNode makeBoolean(Boolean nullable) {
+		return new BooleanTypeNode(nullable);
+	}
 
-  public static TypeNode makeI32(Boolean nullable) {
-    return new I32TypeNode(nullable);
-  }
+	public static TypeNode makeString(Boolean nullable) {
+		return new StringTypeNode(nullable);
+	}
 
-  public static TypeNode makeI64(Boolean nullable) {
-    return new I64TypeNode(nullable);
-  }
+	public static TypeNode makeBinary(Boolean nullable) {
+		return new BinaryTypeNode(nullable);
+	}
 
-  public static TypeNode makeDate(Boolean nullable) {
-    return new DateTypeNode(nullable);
-  }
+	public static TypeNode makeI8(Boolean nullable) {
+		return new I8TypeNode(nullable);
+	}
 
-  public static TypeNode makeDecimal(Boolean nullable, Integer precision, Integer scale) {
-    return new DecimalTypeNode(nullable, precision, scale);
-  }
+	public static TypeNode makeI16(Boolean nullable) {
+		return new I16TypeNode(nullable);
+	}
 
-  public static TypeNode makeTimestamp(Boolean nullable) {
-    return new TimestampTypeNode(nullable);
-  }
+	public static TypeNode makeI32(Boolean nullable) {
+		return new I32TypeNode(nullable);
+	}
 
-  public static TypeNode makeStruct(Boolean nullable, ArrayList<TypeNode> types) {
-    return new StructNode(nullable, types);
-  }
+	public static TypeNode makeI64(Boolean nullable) {
+		return new I64TypeNode(nullable);
+	}
 
-  public static TypeNode makeMap(Boolean nullable, TypeNode keyType, TypeNode valType) {
-    return new MapNode(nullable, keyType, valType);
-  }
+	public static TypeNode makeDate(Boolean nullable) {
+		return new DateTypeNode(nullable);
+	}
 
-  public static TypeNode makeList(Boolean nullable, TypeNode nestedType) {
-    return new ListNode(nullable, nestedType);
-  }
+	public static TypeNode makeDecimal(Boolean nullable, Integer precision, Integer scale) {
+		return new DecimalTypeNode(nullable, precision, scale);
+	}
+
+	public static TypeNode makeTimestamp(Boolean nullable) {
+		return new TimestampTypeNode(nullable);
+	}
+
+	public static TypeNode makeStruct(Boolean nullable, ArrayList<TypeNode> types) {
+		return new StructNode(nullable, types);
+	}
+
+	public static TypeNode makeMap(Boolean nullable, TypeNode keyType, TypeNode valType) {
+		return new MapNode(nullable, keyType, valType);
+	}
+
+	public static TypeNode makeList(Boolean nullable, TypeNode nestedType) {
+		return new ListNode(nullable, nestedType);
+	}
 }

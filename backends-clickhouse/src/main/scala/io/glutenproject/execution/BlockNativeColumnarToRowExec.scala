@@ -26,6 +26,7 @@ import org.apache.spark.sql.catalyst.expressions.{Attribute, UnsafeRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenContext
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.types._
+import javax.lang.model.`type`.ArrayType
 
 case class BlockNativeColumnarToRowExec(child: SparkPlan)
     extends NativeColumnarToRowExec(child = child) {
@@ -44,11 +45,14 @@ case class BlockNativeColumnarToRowExec(child: SparkPlan)
         case d: LongType =>
         case d: FloatType =>
         case d: DoubleType =>
-        case d: StringType =>
-        case d: DateType =>
         case d: DecimalType =>
-        case d: TimestampType =>
+        case d: StringType =>
         case d: BinaryType =>
+        case d: DateType =>
+        case d: TimestampType =>
+        case d: ArrayType =>
+        case d: StructType =>
+        case d: MapType =>
         case _ =>
           throw new UnsupportedOperationException(
             s"${field.dataType} is not supported in NativeColumnarToRowExec.")
