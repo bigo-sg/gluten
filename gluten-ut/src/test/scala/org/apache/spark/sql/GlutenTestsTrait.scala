@@ -38,6 +38,7 @@ import org.apache.spark.sql.catalyst.optimizer.ConvertToLocalRelation
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
+import org.apache.hadoop.hive.ql.parse.HiveParser.structType_return
 
 trait GlutenTestsTrait extends SparkFunSuite with ExpressionEvalHelper with GlutenTestsBaseTrait {
 
@@ -164,22 +165,33 @@ trait GlutenTestsTrait extends SparkFunSuite with ExpressionEvalHelper with Glut
     }
     val inputValues = values.map {
       _ match {
-        case utf8String: UTF8String =>
-          structFileSeq.append(StructField("s", StringType, utf8String == null))
-        case byteArr: Array[Byte] =>
-          structFileSeq.append(StructField("a", BinaryType, byteArr == null))
-        case integer: java.lang.Integer =>
-          structFileSeq.append(StructField("i", IntegerType, integer == null))
-        case long: java.lang.Long =>
-          structFileSeq.append(StructField("l", LongType, long == null))
-        case double: java.lang.Double =>
-          structFileSeq.append(StructField("d", DoubleType, double == null))
+        case boolean: java.lang.Boolean =>
+          structFileSeq.append(StructField("t", BooleanType, boolean == null))
         case short: java.lang.Short =>
           structFileSeq.append(StructField("sh", ShortType, short == null))
         case byte: java.lang.Byte =>
           structFileSeq.append(StructField("b", ByteType, byte == null))
-        case boolean: java.lang.Boolean =>
-          structFileSeq.append(StructField("t", BooleanType, boolean == null))
+        case integer: java.lang.Integer =>
+          structFileSeq.append(StructField("i", IntegerType, integer == null))
+        case long: java.lang.Long =>
+          structFileSeq.append(StructField("l", LongType, long == null))
+        case float: java.lang.Float =>
+          structFileSeq.append(StructField("f", FloatType, float == null))
+        case double: java.lang.Double =>
+          structFileSeq.append(StructField("d", DoubleType, double == null))
+        case utf8String: UTF8String =>
+          structFileSeq.append(StructField("s", StringType, utf8String == null))
+        case byteArr: Array[Byte] =>
+          structFileSeq.append(StructField("a", BinaryType, byteArr == null))
+        case decimal: Decimal =>
+          structFileSeq.append(StructField("dec",
+            DecimalType(decimal.precision, decimal.scale), decimal == null))
+        /// TODO(taiyang-li) date/timestamp如何表示，map/struct/array如何实现
+        /*
+        case row: InternalRow =>
+          structFileSeq.append(StructField("row",
+            StructType(), row == null))
+        */
         case _ =>
           // for null
           structFileSeq.append(StructField("n", IntegerType, true))
