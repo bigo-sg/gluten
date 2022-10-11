@@ -52,8 +52,8 @@ public class BatchIterator extends GeneralOutIterator {
     int cols = nativeBlock.numColumns();
     ColumnVector[] columnVectors = new ColumnVector[cols];
     for (int i = 0; i < cols; i++) {
-      columnVectors[i] = new CHColumnVector(CHExecUtil.inferSparkDataType(nativeBlock.getTypeByPosition(i)),
-          block, i);
+      columnVectors[i] = new CHColumnVector(CHExecUtil.inferSparkDataType(
+        nativeBlock.getTypeByPosition(i)), block, i);
     }
     return new ColumnarBatch(columnVectors, nativeBlock.numRows());
   }
