@@ -22,23 +22,23 @@ import io.substrait.proto.Type;
 import java.io.Serializable;
 
 public class BinaryTypeNode implements TypeNode, Serializable {
-	private final Boolean nullable;
+  private final Boolean nullable;
 
-	BinaryTypeNode(Boolean nullable) {
-		this.nullable = nullable;
-	}
+  BinaryTypeNode(Boolean nullable) {
+    this.nullable = nullable;
+  }
 
-	@Override
-	public Type toProtobuf() {
-		Type.Binary.Builder binaryBuilder = Type.Binary.newBuilder();
-		if (nullable) {
-			binaryBuilder.setNullability(Type.Nullability.NULLABILITY_NULLABLE);
-		} else {
-			binaryBuilder.setNullability(Type.Nullability.NULLABILITY_REQUIRED);
-		}
+  @Override
+  public Type toProtobuf() {
+    Type.Binary.Builder binaryBuilder = Type.Binary.newBuilder();
+    if (nullable) {
+      binaryBuilder.setNullability(Type.Nullability.NULLABILITY_NULLABLE);
+    } else {
+      binaryBuilder.setNullability(Type.Nullability.NULLABILITY_REQUIRED);
+    }
 
-		Type.Builder builder = Type.newBuilder();
-		builder.setBinary(binaryBuilder.build());
-		return builder.build();
-	}
+    Type.Builder builder = Type.newBuilder();
+    builder.setBinary(binaryBuilder.build());
+    return builder.build();
+  }
 }

@@ -22,23 +22,23 @@ import io.substrait.proto.Type;
 import java.io.Serializable;
 
 public class I8TypeNode implements TypeNode, Serializable {
-	private final Boolean nullable;
+  private final Boolean nullable;
 
-	I8TypeNode(Boolean nullable) {
-		this.nullable = nullable;
-	}
+  I8TypeNode(Boolean nullable) {
+    this.nullable = nullable;
+  }
 
-	@Override
-	public Type toProtobuf() {
-		Type.I8.Builder i8Builder = Type.I8.newBuilder();
-		if (nullable) {
-			i8Builder.setNullability(Type.Nullability.NULLABILITY_NULLABLE);
-		} else {
-			i8Builder.setNullability(Type.Nullability.NULLABILITY_REQUIRED);
-		}
+  @Override
+  public Type toProtobuf() {
+    Type.I8.Builder i8Builder = Type.I8.newBuilder();
+    if (nullable) {
+      i8Builder.setNullability(Type.Nullability.NULLABILITY_NULLABLE);
+    } else {
+      i8Builder.setNullability(Type.Nullability.NULLABILITY_REQUIRED);
+    }
 
-		Type.Builder builder = Type.newBuilder();
-		builder.setI8(i8Builder.build());
-		return builder.build();
-	}
+    Type.Builder builder = Type.newBuilder();
+    builder.setI8(i8Builder.build());
+    return builder.build();
+  }
 }

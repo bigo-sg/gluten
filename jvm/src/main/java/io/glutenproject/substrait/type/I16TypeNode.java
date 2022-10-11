@@ -22,23 +22,23 @@ import io.substrait.proto.Type;
 import java.io.Serializable;
 
 public class I16TypeNode implements TypeNode, Serializable {
-	private final Boolean nullable;
+  private final Boolean nullable;
 
-	I16TypeNode(Boolean nullable) {
-		this.nullable = nullable;
-	}
+  I16TypeNode(Boolean nullable) {
+    this.nullable = nullable;
+  }
 
-	@Override
-	public Type toProtobuf() {
-		Type.I16.Builder i16Builder = Type.I16.newBuilder();
-		if (nullable) {
-			i16Builder.setNullability(Type.Nullability.NULLABILITY_NULLABLE);
-		} else {
-			i16Builder.setNullability(Type.Nullability.NULLABILITY_REQUIRED);
-		}
+  @Override
+  public Type toProtobuf() {
+    Type.I16.Builder i16Builder = Type.I16.newBuilder();
+    if (nullable) {
+      i16Builder.setNullability(Type.Nullability.NULLABILITY_NULLABLE);
+    } else {
+      i16Builder.setNullability(Type.Nullability.NULLABILITY_REQUIRED);
+    }
 
-		Type.Builder builder = Type.newBuilder();
-		builder.setI16(i16Builder.build());
-		return builder.build();
-	}
+    Type.Builder builder = Type.newBuilder();
+    builder.setI16(i16Builder.build());
+    return builder.build();
+  }
 }

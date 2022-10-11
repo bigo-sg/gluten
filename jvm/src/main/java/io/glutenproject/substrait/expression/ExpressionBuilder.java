@@ -174,7 +174,7 @@ public class ExpressionBuilder {
     } else if (dataType instanceof DecimalType) {
       if (obj == null) {
         DecimalType decimal = (DecimalType)dataType;
-		    return makeNullLiteral(TypeBuilder.makeDecimal(nullable, decimal.precision(),
+        return makeNullLiteral(TypeBuilder.makeDecimal(nullable, decimal.precision(),
           decimal.scale()));
       } else {
         return makeDecimalLiteral((Decimal) obj);
