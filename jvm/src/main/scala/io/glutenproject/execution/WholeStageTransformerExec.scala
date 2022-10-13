@@ -159,7 +159,7 @@ case class WholeStageTransformerExec(child: SparkPlan)(val transformStageId: Int
       wsCxt.substraitContext.setFileFormat(
         basicScanExecTransformer.map(ConverterUtils.getFileFormat).asJava)
       val substraitPlanPartition = (0 until partitionLength).map( i => {
-        val currentPartitions = basicScanExecTransformer.map(_.getPartitions(i))
+        val currentPartitions = basicScanExecTransformer.map(_.getFlattenPartitions(i))
         BackendsApiManager.getIteratorApiInstance.genNativeFilePartition(
           i, currentPartitions, wsCxt)
       })
