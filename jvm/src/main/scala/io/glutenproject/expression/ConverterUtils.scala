@@ -135,7 +135,7 @@ object ConverterUtils extends Logging {
       case Type.KindCase.BOOL =>
         (BooleanType, isNullable(substraitType.getBool.getNullability))
       case Type.KindCase.I8 =>
-        (ByteType, substraitType.getI8.getNullability == Type.Nullability.NULLABILITY_NULLABLE)
+        (ByteType, isNullable(substraitType.getI8.getNullability))
       case Type.KindCase.I16 =>
         (ShortType, isNullable(substraitType.getI16.getNullability))
       case Type.KindCase.I32 =>
