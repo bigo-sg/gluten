@@ -166,16 +166,19 @@ object ConverterUtils extends Logging {
           val (field, nullable) = parseFromSubstraitType(typ)
           fields.add(StructField("", field, nullable))
         }
-        (StructType(fields), false)
+        (StructType(fields),
+          isNullable(substraitType.getStruct.getNullability))
       case Type.KindCase.LIST =>
         val list = substraitType.getList
         val (elementType, containsNull) = parseFromSubstraitType(list.getType)
-        (ArrayType(elementType, containsNull), false)
+        (ArrayType(elementType, containsNull),
+          isNullable(substraitType.getList.getNullability))
       case Type.KindCase.MAP =>
         val map = substraitType.getMap
         val (keyType, _) = parseFromSubstraitType(map.getKey)
         val (valueType, valueContainsNull) = parseFromSubstraitType(map.getValue())
-        (MapType(keyType, valueType, valueContainsNull), false)
+        (MapType(keyType, valueType, valueContainsNull),
+          isNullable(substraitType.getMap.getNullability))
       case unsupported =>
         throw new UnsupportedOperationException(s"Type $unsupported not supported.")
     }
@@ -211,11 +214,23 @@ object ConverterUtils extends Logging {
       case TimestampType =>
         TypeBuilder.makeTimestamp(nullable)
       case m: MapType =>
+        if (nullable) {
+          throw new UnsupportedOperationException(s"Type $m with nullable == true not supported.")
+        }
+
         TypeBuilder.makeMap(nullable, getTypeNode(m.keyType, false),
           getTypeNode(m.valueType, m.valueContainsNull))
       case a: ArrayType =>
+        if (nullable) {
+          throw new UnsupportedOperationException(s"Type $a with nullable == true not supported.")
+        }
+
         TypeBuilder.makeList(nullable, getTypeNode(a.elementType, a.containsNull))
       case s: StructType =>
+        if (nullable) {
+          throw new UnsupportedOperationException(s"Type $s with nullable == true not supported.")
+        }
+
         val fieldNodes = new java.util.ArrayList[TypeNode]
         for (structField <- s.fields) {
           fieldNodes.add(getTypeNode(structField.dataType, structField.nullable))
