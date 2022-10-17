@@ -192,7 +192,7 @@ object ConverterUtils extends Logging {
         TypeBuilder.makeFP32(nullable)
       case DoubleType =>
         TypeBuilder.makeFP64(nullable)
-            case LongType =>
+      case LongType =>
         TypeBuilder.makeI64(nullable)
       case IntegerType =>
         TypeBuilder.makeI32(nullable)
