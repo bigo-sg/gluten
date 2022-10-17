@@ -23,6 +23,7 @@ import io.glutenproject.utils.velox.VeloxNotSupport
 import org.apache.spark.sql.GlutenTestConstants
 import org.apache.spark.sql.catalyst.analysis.FunctionRegistryBase
 import org.apache.spark.sql.catalyst.expressions.{Expression, ExpressionInfo, NullExpressionsSuite}
+import org.apache.spark.internal.Logging
 
 import scala.reflect.ClassTag
 
