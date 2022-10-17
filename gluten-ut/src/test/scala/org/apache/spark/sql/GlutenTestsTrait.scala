@@ -186,11 +186,6 @@ trait GlutenTestsTrait extends SparkFunSuite with ExpressionEvalHelper with Glut
         case decimal: Decimal =>
           structFileSeq.append(StructField("dec",
             DecimalType(decimal.precision, decimal.scale), decimal == null))
-        /*
-        case row: InternalRow =>
-          structFileSeq.append(StructField("row",
-            StructType(), row == null))
-        */
         case _ =>
           // for null
           structFileSeq.append(StructField("n", IntegerType, true))

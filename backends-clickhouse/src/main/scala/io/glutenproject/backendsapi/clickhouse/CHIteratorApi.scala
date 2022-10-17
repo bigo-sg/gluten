@@ -49,15 +49,12 @@ class CHIteratorApi extends IIteratorApi with Logging {
       index: Int,
       partitions: Seq[InputPartition],
       wsCxt: WholestageTransformContext): BaseNativeFilePartition = {
-    logDebug(s"partition number:${partitions.size}")
     val localFilesNodes = partitions.indices.map(i =>
       partitions(i) match {
         case p: NativeMergeTreePartition =>
-          logDebug(s"index:${i} NativeMergeTreePartition")
           ExtensionTableBuilder
             .makeExtensionTable(p.minParts, p.maxParts, p.database, p.table, p.tablePath)
         case FilePartition(index, files) =>
-          logDebug(s"index:${i} FilePartition")
           val paths = new java.util.ArrayList[String]()
           val starts = new java.util.ArrayList[java.lang.Long]()
           val lengths = new java.util.ArrayList[java.lang.Long]()
@@ -73,7 +70,6 @@ class CHIteratorApi extends IIteratorApi with Logging {
             lengths,
             wsCxt.substraitContext.getFileFormat.get(i))
         case _ =>
-          logDebug(s"index:${i} Unknown")
           throw new UnsupportedOperationException(s"Unsupport operators.")
       })
     wsCxt.substraitContext.initLocalFilesNodesIndex(0)

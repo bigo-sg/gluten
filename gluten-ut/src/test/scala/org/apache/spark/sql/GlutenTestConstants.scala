@@ -38,7 +38,6 @@ object GlutenTestConstants {
     BinaryType,
     DateType,
     TimestampType,
-    DecimalType,
     ArrayType,
     StructType,
     MapType

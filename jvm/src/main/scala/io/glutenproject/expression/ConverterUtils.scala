@@ -331,7 +331,7 @@ object ConverterUtils extends Logging {
         case ByteType =>
           typedFuncName.concat("i8")
         case ShortType =>
-          typedFuncName.concat("i8")
+          typedFuncName.concat("i16")
         case IntegerType =>
           typedFuncName.concat("i32")
         case LongType =>
@@ -347,7 +347,7 @@ object ConverterUtils extends Logging {
         case StringType =>
           typedFuncName.concat("str")
         case BinaryType =>
-          typedFuncName.concat("bin")
+          typedFuncName.concat("vbin")
         case DecimalType() =>
           typedFuncName.concat("dec")
         case ArrayType(_, _) =>
