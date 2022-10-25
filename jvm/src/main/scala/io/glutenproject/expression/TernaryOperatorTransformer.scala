@@ -61,7 +61,22 @@ class SplitTransformer(str: Expression, delimiter: Expression, limit: Expression
     with Logging {
 
   override def doTransform(args: java.lang.Object): ExpressionNode = {
-    throw new UnsupportedOperationException("Not supported: Split.")
+    val strNode = str.asInstanceOf[ExpressionTransformer].doTransform(args)
+    val delimNode = delimiter.asInstanceOf[ExpressionTransformer].doTransform(args)
+    val limitNode = limit.asInstanceOf[ExpressionTransformer].doTransform(args)
+    if (!strNode.isInstanceOf[ExpressionNode] ||
+      !delimNode.isInstanceOf[ExpressionNode] ||
+      !limitNode.isInstanceOf[ExpressionNode]) {
+      throw new UnsupportedOperationException(s"Not supported yet.")
+    }
+
+    val functionMap = args.asInstanceOf[java.util.HashMap[String, java.lang.Long]]
+    val functionName = ConverterUtils.makeFuncName(ConverterUtils.SPLIT,
+      Seq(str.dataType, delimiter.dataType, limit.dataType), FunctionConfig.OPT)
+    val functionId = ExpressionBuilder.newScalarFunction(functionMap, functionName)
+    val expressionNodes = Lists.newArrayList(strNode, delimNode, limitNode)
+    val typeNode = TypeBuilder.makeString(original.nullable)
+    ExpressionBuilder.makeScalarFunction(functionId, expressionNodes, typeNode)
   }
 }
 
