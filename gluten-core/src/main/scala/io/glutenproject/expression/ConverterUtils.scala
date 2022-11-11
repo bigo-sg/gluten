@@ -463,7 +463,12 @@ object ConverterUtils extends Logging {
   final val LEAST = "least"
 
   final val MURMUR3HASH = "murmur3hash"
+
+  // table-valued generator function
+  final val EXPLODE = "explode"
+
   // Other
   final val ROW_CONSTRUCTOR = "row_constructor"
+
 
 }

@@ -356,6 +356,26 @@ class PromotePrecisionTransformer(child: Expression, original: PromotePrecision)
   }
 }
 
+class ExplodeTransformer(child: Expression, original: Expression)
+  extends Explode(child: Expression)
+    with ExpressionTransformer
+    with Logging {
+
+  override def doTransform(args: java.lang.Object): ExpressionNode = {
+    val childNode: ExpressionNode =
+      child.asInstanceOf[ExpressionTransformer].doTransform(args)
+    if (!childNode.isInstanceOf[ExpressionNode]) {
+      throw new UnsupportedOperationException(s"not supported yet.")
+    }
+    val functionMap = args.asInstanceOf[java.util.HashMap[String, java.lang.Long]]
+    val functionId = ExpressionBuilder.newScalarFunction(functionMap,
+      ConverterUtils.makeFuncName(ConverterUtils.EXPLODE, Seq(child.dataType)))
+    val expressionNodes = Lists.newArrayList(childNode.asInstanceOf[ExpressionNode])
+    val typeNode = ConverterUtils.getTypeNode(original.dataType, original.nullable)
+    ExpressionBuilder.makeScalarFunction(functionId, expressionNodes, typeNode)
+  }
+}
+
 object UnaryOperatorTransformer {
 
   def create(child: Expression, original: Expression): Expression = original match {
@@ -423,6 +443,8 @@ object UnaryOperatorTransformer {
       new MillisToTimestampTransformer(child)
     case a: MicrosToTimestamp =>
       new MicrosToTimestampTransformer(child)
+    case e: Explode =>
+      new ExplodeTransformer(child, e)
     case other =>
       throw new UnsupportedOperationException(s"not currently supported: $other.")
   }
