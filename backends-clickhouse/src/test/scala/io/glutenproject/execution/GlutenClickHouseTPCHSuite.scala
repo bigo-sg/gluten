@@ -306,4 +306,5 @@ class GlutenClickHouseTPCHSuite extends GlutenClickHouseTPCHAbstractSuite {
       ("spark.sql.autoBroadcastJoinThreshold", "-1"),
       ("spark.gluten.sql.columnar.forceshuffledhashjoin", "true")) {}
   }
+
 }

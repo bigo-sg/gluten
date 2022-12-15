@@ -331,6 +331,124 @@ class GlutenClickHouseTPCHParquetSuite extends GlutenClickHouseTPCHAbstractSuite
     runTPCHQuery(22) { df => }
   }
 
+  test("window row_number") {
+    val sql =
+      """
+        |select row_number() over (partition by l_suppkey order by l_orderkey) from lineitem
+        |order by l_suppkey, l_orderkey
+        |""".stripMargin
+    compareResultsAgainstVanillaSpark(sql, true, { _ => })
+  }
+
+  test("window sum") {
+    val sql =
+      """
+        |select sum(l_partkey + 1) over (partition by l_suppkey order by l_orderkey) from lineitem
+        |order by l_suppkey, l_orderkey
+        |""".stripMargin
+    compareResultsAgainstVanillaSpark(sql, true, { _ => })
+  }
+
+  test("window max") {
+    val sql =
+      """
+        |select max(l_partkey) over (partition by l_suppkey order by l_orderkey) from lineitem
+        |order by l_suppkey, l_orderkey
+        |""".stripMargin
+    compareResultsAgainstVanillaSpark(sql, true, { _ => })
+  }
+
+  test("window min") {
+    val sql =
+      """
+        |select min(l_partkey) over (partition by l_suppkey order by l_orderkey) from lineitem
+        |order by l_suppkey,l_orderkey
+        |""".stripMargin
+    compareResultsAgainstVanillaSpark(sql, true, { _ => })
+  }
+
+  test("window avg") {
+    val sql =
+      """
+        |select avg(l_partkey) over (partition by l_suppkey order by l_orderkey) from lineitem
+        |order by l_suppkey, l_orderkey
+        |""".stripMargin
+    compareResultsAgainstVanillaSpark(sql, true, { _ => })
+  }
+
+  test("window rank") {
+    val sql =
+      """
+        |select n_nationkey, n_name, n_regionkey, n_rank from (
+        | select n_nationkey, n_name, n_regionkey,
+        | rank() over (partition by n_regionkey order by n_nationkey) as n_rank
+        | from nation
+        |) as t
+        |order by n_regionkey,n_nationkey
+        |""".stripMargin
+    var hasWindowTransform = false
+    compareResultsAgainstVanillaSpark(
+      sql,
+      true,
+      {
+        df =>
+          df match {
+            case _: WindowExecTransformer => hasWindowTransform = true
+            case _ =>
+          }
+      })
+    assert(hasWindowTransform)
+  }
+
+  test("window offset preceding") {
+    val sql =
+      """
+        |select avg(l_partkey) over (partition by l_suppkey order by l_orderkey rows between 3
+        |preceding and current row) from lineitem
+        |order by l_suppkey, l_orderkey
+        |""".stripMargin
+    compareResultsAgainstVanillaSpark(sql, true, { _ => })
+  }
+
+  test("window offset following") {
+    val sql =
+      """
+        |select avg(l_partkey) over (partition by l_suppkey order by l_orderkey rows between
+        |current row and 3 following) from lineitem
+        |order by l_suppkey, l_orderkey
+        |""".stripMargin
+    compareResultsAgainstVanillaSpark(sql, true, { _ => })
+  }
+
+  test("windows") {
+    val sql =
+      """
+        |select n_nationkey, n_name, n_regionkey, n_rank, n_sum from (
+        | select n_nationkey, n_name, n_regionkey,
+        | rank() over (partition by n_regionkey order by n_nationkey) as n_rank
+        | sum(n_nationkey) over (partition by n_regionkey order by n_nationkey) as n_sum
+        | from nation
+        |) as t
+        |order by n_regionkey,n_nationkey
+        |""".stripMargin
+    compareResultsAgainstVanillaSpark(sql, true, { _ => })
+  }
+
+  test("window range") {
+    val sql =
+      """
+        |select n_nationkey, n_name, n_regionkey, n_sum from (
+        | select n_nationkey, n_name, n_regionkey,
+        | sum(n_nationkey) over (partition by n_regionkey order by n_nationkey range
+        | between unbounded preceding and current row)
+        |  as n_sum
+        | from nation
+        |) as t
+        |order by n_regionkey,n_nationkey
+        |""".stripMargin
+    compareResultsAgainstVanillaSpark(sql, true, { _ => })
+  }
+
   override protected def runTPCHQuery(
       queryNum: Int,
       tpchQueries: String = tpchQueries,
