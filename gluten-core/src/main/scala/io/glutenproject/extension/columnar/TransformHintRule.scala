@@ -580,7 +580,7 @@ case class AddTransformHintRule() extends Rule[SparkPlan] {
     } catch {
       case e: UnsupportedOperationException =>
         logWarning(
-          s"Fall back to use row-based operators, error is ${e.getMessage}," +
+          s"Fall back to use row-based operators, error is ${e.printStackTrace}," +
             s"original sparkplan is ${plan.getClass}(${plan.children.toList.map(_.getClass)})")
         TransformHints.tagNotTransformable(plan)
     }

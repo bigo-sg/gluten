@@ -395,7 +395,7 @@ class GlutenClickHouseTPCHParquetSuite extends GlutenClickHouseTPCHAbstractSuite
     checkLengthAndPlan(df, 10)
   }
 
-  ignore("test 'aggregate function collect_list'") {
+  test("test 'aggregate function collect_list'") {
     val df = runQueryAndCompare(
       "select l_orderkey,from_unixtime(l_orderkey, 'yyyy-MM-dd HH:mm:ss') " +
         "from lineitem order by l_orderkey desc limit 10"
