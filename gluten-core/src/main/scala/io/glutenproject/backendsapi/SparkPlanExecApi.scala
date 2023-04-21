@@ -18,7 +18,10 @@
 package io.glutenproject.backendsapi
 
 import io.glutenproject.execution._
-import io.glutenproject.expression.{AliasBaseTransformer, ExpressionTransformer, GetStructFieldTransformer, NamedStructTransformer}
+import io.glutenproject.expression.{AliasBaseTransformer, ConverterUtils, ExpressionTransformer, GetStructFieldTransformer, NamedStructTransformer}
+import io.glutenproject.substrait.rel.RelBuilder;
+import io.glutenproject.substrait.`type`.TypeNode
+
 import org.apache.spark.ShuffleDependency
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.Serializer
@@ -27,15 +30,17 @@ import org.apache.spark.sql.{SparkSession, Strategy}
 import org.apache.spark.sql.catalyst.expressions.{Attribute, CreateNamedStruct, Expression, GetStructField, NamedExpression}
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateExpression
 import org.apache.spark.sql.catalyst.optimizer.BuildSide
+import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.plans.physical.{BroadcastMode, Partitioning}
-import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.execution.joins.BuildSideRelation
 import org.apache.spark.sql.execution.metric.SQLMetric
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.vectorized.ColumnarBatch
+
+import java.util
 
 trait SparkPlanExecApi {
 
@@ -218,5 +223,22 @@ trait SparkPlanExecApi {
                                 original: CreateNamedStruct,
                                 attributeSeq: Seq[Attribute]): ExpressionTransformer = {
     new NamedStructTransformer(substraitExprName, original, attributeSeq)
+  }
+
+  /**
+   * In default, just use the plan.output to generate the output scheme. There are some special
+   * cases, such as HashAggregateExec in ClickHouse, we need to build a special chema for the 1st
+   * aggregating stage which is quite different form the plan.output.
+   */
+  def genOutputSchema(plan: SparkPlan): (util.ArrayList[TypeNode], util.ArrayList[String]) = {
+    val typeNodes = new util.ArrayList[TypeNode]()
+    val names = new util.ArrayList[String]()
+    plan.output.foreach {
+      attr =>
+        typeNodes.add(ConverterUtils.getTypeNode(attr.dataType, attr.nullable))
+        names.add(ConverterUtils.genColumnNameWithExprId(attr))
+        names.addAll(RelBuilder.collectStructFieldNamesDFS(attr.dataType))
+    }
+    (typeNodes, names)
   }
 }
