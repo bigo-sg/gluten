@@ -17,7 +17,9 @@
 package io.glutenproject.backendsapi
 
 import io.glutenproject.execution._
-import io.glutenproject.expression.{AliasBaseTransformer, ExpressionTransformer, GetStructFieldTransformer, NamedStructTransformer, Sha1Transformer, Sha2Transformer}
+import io.glutenproject.expression.{AliasBaseTransformer, ConverterUtils, ExpressionTransformer, GetStructFieldTransformer, NamedStructTransformer, Sha1Transformer, Sha2Transformer}
+import io.glutenproject.substrait.`type`.TypeNode
+
 import org.apache.spark.ShuffleDependency
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.Serializer
@@ -182,14 +184,14 @@ trait SparkPlanExecApi {
   def genExtendedStrategies(): List[SparkSession => Strategy]
 
   /**
-   * Generate extended columnar pre-rules.
+   * Generate extended columnar pre-rules. Currently only for Velox backend.
    *
    * @return
    */
   def genExtendedColumnarPreRules(): List[SparkSession => Rule[SparkPlan]]
 
   /**
-   * Generate extended columnar post-rules.
+   * Generate extended columnar post-rules. Currently only for Velox backend.
    *
    * @return
    */
@@ -242,4 +244,19 @@ trait SparkPlanExecApi {
     c
   }
 
+  /**
+   * In default, just use the plan.output to generate the output scheme. There are some special
+   * cases, such as HashAggregateExec in ClickHouse, we need to build a special chema for the 1st
+   * aggregating stage which is quite different form the plan.output.
+   */
+  def genOuputScheme(plan: SparkPlan): (Seq[TypeNode], Seq[String]) = {
+    val typeNodes = Seq[TypeNode]()
+    val names = Seq[String]()
+    plan.output.foreach {
+      attr =>
+        typeNodes :+ ConverterUtils.getTypeNode(attr.dataType, attr.nullable)
+        names :+ ConverterUtils.genColumnNameWithExprId(attr)
+    }
+    (typeNodes, names)
+  }
 }
