@@ -6,9 +6,16 @@ import com.google.protobuf.ByteString;
 
 import io.glutenproject.substrait.type.*;
 
-public class ScalarLiteralNode<T> extends LiteralNode<T> {
+public class ScalarLiteralNode<T> extends LiteralNode {
+  private final T value;
+
   public ScalarLiteralNode(T value, TypeNode typeNode) {
-    super(value, typeNode);
+    super(typeNode);
+    this.value = value;
+  }
+
+  public T getValue() {
+    return value;
   }
 
   @Override

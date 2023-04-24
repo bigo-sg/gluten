@@ -49,10 +49,6 @@ public class ExpressionBuilder {
     return new NullLiteralNode(typeNode);
   }
 
-  public static NullLiteralNode makeNullLiteral(DataType dataType, Boolean nullable) {
-    return new NullLiteralNode(dataType, nullable);
-  }
-
   public static BooleanLiteralNode makeBooleanLiteral(Boolean booleanConstant) {
     return new BooleanLiteralNode(booleanConstant);
   }

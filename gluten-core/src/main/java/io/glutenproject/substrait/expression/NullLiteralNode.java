@@ -20,30 +20,21 @@ package io.glutenproject.substrait.expression;
 import io.glutenproject.substrait.type.TypeNode;
 import io.glutenproject.expression.ConverterUtils;
 import io.substrait.proto.Expression;
+import io.substrait.proto.Expression.Literal;
 
 import java.io.Serializable;
 
 import org.apache.spark.sql.types.DataType;
 
-public class NullLiteralNode implements ExpressionNode, Serializable {
-  private final TypeNode typeNode;
-
+public class NullLiteralNode extends LiteralNode {
   public NullLiteralNode(TypeNode typeNode) {
-    this.typeNode = typeNode;
-  }
-
-  public NullLiteralNode(DataType dataType, Boolean nullable) {
-    this.typeNode = ConverterUtils.getTypeNode(dataType, nullable);
+    super(typeNode);
   }
 
   @Override
-  public Expression toProtobuf() {
-    Expression.Literal.Builder literalBuilder =
-        Expression.Literal.newBuilder();
-    literalBuilder.setNull(typeNode.toProtobuf());
-
-    Expression.Builder builder = Expression.newBuilder();
-    builder.setLiteral(literalBuilder.build());
-    return builder.build();
+  protected Expression.Literal getLiteral() {
+    Expression.Literal.Builder literalBuilder = Expression.Literal.newBuilder();
+    literalBuilder.setNull(getTypeNode().toProtobuf());
+    return literalBuilder.build();
   }
 }

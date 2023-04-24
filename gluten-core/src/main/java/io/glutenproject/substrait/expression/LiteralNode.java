@@ -23,17 +23,11 @@ import io.glutenproject.substrait.type.TypeNode;
 
 import java.io.Serializable;
 
-abstract class LiteralNode<T> implements ExpressionNode, Serializable {
-  private final T value;
+abstract class LiteralNode implements ExpressionNode, Serializable {
   private final TypeNode typeNode;
 
-  LiteralNode(T value, TypeNode typeNode) {
-    this.value = value;
+  LiteralNode(TypeNode typeNode) {
     this.typeNode = typeNode;
-  }
-
-  public T getValue() {
-    return value;
   }
 
   public TypeNode getTypeNode() {

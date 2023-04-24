@@ -18,19 +18,22 @@
 package io.glutenproject.substrait.expression;
 
 import com.google.protobuf.ByteString;
+
+import io.glutenproject.substrait.type.DecimalTypeNode;
+import io.glutenproject.substrait.type.TypeBuilder;
+import io.glutenproject.substrait.type.TypeNode;
 import io.substrait.proto.Expression;
+
 import org.apache.spark.sql.types.Decimal;
 
-import java.io.Serializable;
 import java.math.BigDecimal;
 
-public class DecimalLiteralNode implements ExpressionNode, Serializable {
-    private final Decimal value;
+public class DecimalLiteralNode extends ScalarLiteralNode<Decimal> {
     private final ByteString valueBytes;
 
     public DecimalLiteralNode(Decimal value) {
+        super(value, TypeBuilder.makeDecimal(true, value.precision(), value.scale()));
         ExpressionBuilder.checkDecimalScale(value.scale());
-        this.value = value;
         this.valueBytes = ByteString.copyFrom(
                 encodeDecimalIntoBytes(value.toJavaBigDecimal(), value.scale(), 16));
     }
@@ -71,7 +74,8 @@ public class DecimalLiteralNode implements ExpressionNode, Serializable {
     }
 
     @Override
-    public Expression toProtobuf() {
+    protected Expression.Literal getLiteral() {
+        Decimal value = getValue();
         Expression.Literal.Decimal.Builder decimalBuilder = Expression.Literal.Decimal.newBuilder();
         decimalBuilder.setPrecision(value.precision());
         decimalBuilder.setScale(value.scale());
@@ -81,9 +85,7 @@ public class DecimalLiteralNode implements ExpressionNode, Serializable {
         Expression.Literal.Builder literalBuilder = Expression.Literal.newBuilder();
         literalBuilder.setDecimal(decimalBuilder.build());
 
-        Expression.Builder builder = Expression.newBuilder();
-        builder.setLiteral(literalBuilder.build());
-        return builder.build();
+        return literalBuilder.build();
     }
 
     private static final byte zero = 0;
