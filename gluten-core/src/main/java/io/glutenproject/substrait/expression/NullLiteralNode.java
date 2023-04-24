@@ -18,15 +18,22 @@
 package io.glutenproject.substrait.expression;
 
 import io.glutenproject.substrait.type.TypeNode;
+import io.glutenproject.expression.ConverterUtils;
 import io.substrait.proto.Expression;
 
 import java.io.Serializable;
+
+import org.apache.spark.sql.types.DataType;
 
 public class NullLiteralNode implements ExpressionNode, Serializable {
   private final TypeNode typeNode;
 
   public NullLiteralNode(TypeNode typeNode) {
     this.typeNode = typeNode;
+  }
+
+  public NullLiteralNode(DataType dataType, Boolean nullable) {
+    this.typeNode = ConverterUtils.getTypeNode(dataType, nullable);
   }
 
   @Override
