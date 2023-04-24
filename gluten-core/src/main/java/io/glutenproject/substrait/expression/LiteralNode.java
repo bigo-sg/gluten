@@ -17,10 +17,35 @@
 
 package io.glutenproject.substrait.expression;
 
+import io.substrait.proto.Expression;
+
+import java.io.Serializable;
+
 import org.apache.spark.sql.types.*;
 
-public class ByteLiteralNode extends ScalarLiteralNode<Byte> {
-  public ByteLiteralNode(Byte value) {
-    super(value, new ByteType());
+abstract public class LiteralNode<T> implements ExpressionNode, Serializable {
+  private final T value;
+  private final DataType dataType;
+
+  public LiteralNode(T value, DataType dateType) {
+    this.value = value;
+    this.dataType = dateType;
+  }
+
+  public T getValue() {
+    return value;
+  }
+
+  public DataType getDataType() {
+    return dataType;
+  }
+
+  protected abstract Expression.Literal getLiteral();
+
+  @Override
+  public Expression toProtobuf() {
+    Expression.Builder builder = Expression.newBuilder();
+    builder.setLiteral(getLiteral());
+    return builder.build();
   }
 }

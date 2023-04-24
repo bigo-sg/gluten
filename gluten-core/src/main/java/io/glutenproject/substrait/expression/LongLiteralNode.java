@@ -17,24 +17,11 @@
 
 package io.glutenproject.substrait.expression;
 
-import io.substrait.proto.Expression;
+import org.apache.spark.sql.types.*;
 
-import java.io.Serializable;
-
-public class LongLiteralNode implements ExpressionNode, Serializable {
-  private final Long value;
-
+public class LongLiteralNode extends ScalarLiteralNode<Long> {
   public LongLiteralNode(Long value) {
-    this.value = value;
-  }
-
-  @Override
-  public Expression toProtobuf() {
-    Expression.Literal.Builder longBuilder = Expression.Literal.newBuilder();
-    longBuilder.setI64(value);
-
-    Expression.Builder builder = Expression.newBuilder();
-    builder.setLiteral(longBuilder.build());
-    return builder.build();
+    super(value, new LongType());
   }
 }
+

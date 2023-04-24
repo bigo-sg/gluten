@@ -17,25 +17,10 @@
 
 package io.glutenproject.substrait.expression;
 
-import io.substrait.proto.Expression;
+import org.apache.spark.sql.types.*;
 
-import java.io.Serializable;
-
-public class DateLiteralNode implements ExpressionNode, Serializable {
-  private final Integer value;
-
+public class DateLiteralNode extends ScalarLiteralNode<Integer> {
   public DateLiteralNode(Integer value) {
-    this.value = value;
-  }
-
-  @Override
-  public Expression toProtobuf() {
-    Expression.Literal.Builder dateBuilder =
-        Expression.Literal.newBuilder();
-    dateBuilder.setDate(value);
-
-    Expression.Builder builder = Expression.newBuilder();
-    builder.setLiteral(dateBuilder.build());
-    return builder.build();
+    super(value, new DateType());
   }
 }

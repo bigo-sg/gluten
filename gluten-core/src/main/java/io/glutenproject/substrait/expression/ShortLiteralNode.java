@@ -17,25 +17,10 @@
 
 package io.glutenproject.substrait.expression;
 
-import io.substrait.proto.Expression;
+import org.apache.spark.sql.types.*;
 
-import java.io.Serializable;
-
-public class ShortLiteralNode implements ExpressionNode, Serializable {
-  private final Short value;
-
+public class ShortLiteralNode extends ScalarLiteralNode<Short> {
   public ShortLiteralNode(Short value) {
-    this.value = value;
-  }
-
-  @Override
-  public Expression toProtobuf() {
-    Expression.Literal.Builder intBuilder =
-        Expression.Literal.newBuilder();
-    intBuilder.setI16(value);
-
-    Expression.Builder builder = Expression.newBuilder();
-    builder.setLiteral(intBuilder.build());
-    return builder.build();
+    super(value, new ShortType());
   }
 }

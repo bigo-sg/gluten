@@ -17,25 +17,10 @@
 
 package io.glutenproject.substrait.expression;
 
-import io.substrait.proto.Expression;
+import org.apache.spark.sql.types.*;
 
-import java.io.Serializable;
-
-public class BooleanLiteralNode implements ExpressionNode, Serializable {
-  private final Boolean value;
-
+public class BooleanLiteralNode extends ScalarLiteralNode<Boolean> {
   public BooleanLiteralNode(Boolean value) {
-    this.value = value;
-  }
-
-  @Override
-  public Expression toProtobuf() {
-    Expression.Literal.Builder booleanBuilder =
-        Expression.Literal.newBuilder();
-    booleanBuilder.setBoolean(value);
-
-    Expression.Builder builder = Expression.newBuilder();
-    builder.setLiteral(booleanBuilder.build());
-    return builder.build();
+    super(value, new BooleanType());
   }
 }

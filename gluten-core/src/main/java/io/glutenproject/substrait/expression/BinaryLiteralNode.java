@@ -17,27 +17,10 @@
 
 package io.glutenproject.substrait.expression;
 
-import io.substrait.proto.Expression;
+import org.apache.spark.sql.types.*;
 
-import java.io.Serializable;
-
-import com.google.protobuf.ByteString;
-
-public class BinaryLiteralNode implements ExpressionNode, Serializable {
-  private final ByteString value;
-
+public class BinaryLiteralNode extends ScalarLiteralNode<byte[]> {
   public BinaryLiteralNode(byte[] value) {
-    this.value = ByteString.copyFrom(value);
-  }
-
-  @Override
-  public Expression toProtobuf() {
-    Expression.Literal.Builder binaryBuilder =
-        Expression.Literal.newBuilder();
-    binaryBuilder.setBinary(value);
-
-    Expression.Builder builder = Expression.newBuilder();
-    builder.setLiteral(binaryBuilder.build());
-    return builder.build();
+    super(value, new BinaryType());
   }
 }
