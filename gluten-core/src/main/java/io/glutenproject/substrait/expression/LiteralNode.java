@@ -15,33 +15,31 @@
  * limitations under the License.
  */
 
-package io.glutenproject.substrait.type;
+package io.glutenproject.substrait.expression;
 
-import io.substrait.proto.Type;
+import io.substrait.proto.Expression;
+
+import io.glutenproject.substrait.type.TypeNode;
 
 import java.io.Serializable;
 
-public class FixedBinaryTypeNode implements TypeNode, Serializable {
-  private final Boolean nullable;
-  private final int length;
+public abstract class LiteralNode implements ExpressionNode, Serializable {
+  private final TypeNode typeNode;
 
-  public FixedBinaryTypeNode(Boolean nullable, int length) {
-    this.nullable = nullable;
-    this.length = length;
+  LiteralNode(TypeNode typeNode) {
+    this.typeNode = typeNode;
   }
 
-  @Override
-  public Type toProtobuf() {
-    Type.FixedBinary.Builder fixedBinaryBuilder = Type.FixedBinary.newBuilder();
-    if (nullable) {
-      fixedBinaryBuilder.setNullability(Type.Nullability.NULLABILITY_NULLABLE);
-    } else {
-      fixedBinaryBuilder.setNullability(Type.Nullability.NULLABILITY_REQUIRED);
-    }
-    fixedBinaryBuilder.setLength(length);
+  public TypeNode getTypeNode() {
+    return typeNode;
+  }
 
-    Type.Builder builder = Type.newBuilder();
-    builder.setFixedBinary(fixedBinaryBuilder.build());
+  protected abstract Expression.Literal getLiteral();
+
+  @Override
+  public Expression toProtobuf() {
+    Expression.Builder builder = Expression.newBuilder();
+    builder.setLiteral(getLiteral());
     return builder.build();
   }
 }

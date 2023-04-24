@@ -1967,20 +1967,23 @@ std::pair<DataTypePtr, Field> SerializedPlanParser::parseLiteral(const substrait
                 throw Exception(ErrorCodes::UNKNOWN_TYPE, "Spark doesn't support decimal type with precision {}", precision);
             break;
         }
-        /// TODO(taiyang-li) Other type: Struct/Map/List
         case substrait::Expression_Literal::kList: {
-            /// TODO(taiyang-li) Implement empty list
-            if (literal.has_empty_list())
-                throw Exception(ErrorCodes::BAD_ARGUMENTS, "Empty list not support!");
+            const auto & values = literal.list().values();
+            if (values.empty())
+            {
+                type = std::make_shared<DataTypeArray>(std::make_shared<DataTypeNothing>());
+                field = Array();
+                break;
+            }
 
             DataTypePtr first_type;
-            std::tie(first_type, std::ignore) = parseLiteral(literal.list().values(0));
+            std::tie(first_type, std::ignore) = parseLiteral(values[0]);
 
-            size_t list_len = literal.list().values_size();
+            size_t list_len = values.size();
             Array array(list_len);
             for (size_t i = 0; i < list_len; ++i)
             {
-                auto type_and_field = std::move(parseLiteral(literal.list().values(i)));
+                auto type_and_field = std::move(parseLiteral(values[i]));
                 if (!first_type->equals(*type_and_field.first))
                     throw Exception(
                         ErrorCodes::LOGICAL_ERROR,
@@ -1992,6 +1995,75 @@ std::pair<DataTypePtr, Field> SerializedPlanParser::parseLiteral(const substrait
 
             type = std::make_shared<DataTypeArray>(first_type);
             field = std::move(array);
+            break;
+        }
+        case substrait::Expression_Literal::kMap: {
+            const auto & key_values = literal.map().key_values();
+            if (key_values.empty())
+            {
+                type = std::make_shared<DataTypeMap>(std::make_shared<DataTypeNothing>(), std::make_shared<DataTypeNothing>());
+                field = Map();
+                break;
+            }
+
+            const auto & first_key_value = key_values[0];
+
+            DataTypePtr first_key_type;
+            std::tie(first_key_type, std::ignore) = parseLiteral(first_key_value.key());
+
+            DataTypePtr first_value_type;
+            std::tie(first_value_type, std::ignore) = parseLiteral(first_key_value.value());
+
+            Map map;
+            map.reserve(key_values.size());
+            for (int i=0; i<key_values.size(); ++i)
+            {
+                Tuple tuple(2);
+
+                DataTypePtr key_type;
+                std::tie(key_type, tuple[0]) = parseLiteral(key_values[i].key());
+                if (!first_key_type->equals(*key_type))
+                    throw Exception(
+                        ErrorCodes::LOGICAL_ERROR,
+                        "Literal map key type mismatch:{} and {}",
+                        first_key_type->getName(),
+                        key_type->getName());
+
+                DataTypePtr value_type;
+                std::tie(value_type, tuple[1]) = parseLiteral(key_values[i].value());
+                if (!first_value_type->equals(*value_type))
+                    throw Exception(
+                        ErrorCodes::LOGICAL_ERROR,
+                        "Literal map value type mismatch:{} and {}",
+                        first_value_type->getName(),
+                        value_type->getName());
+
+                map.emplace_back(std::move(tuple));
+            }
+
+            type = std::make_shared<DataTypeMap>(first_key_type, first_value_type);
+            field = std::move(map);
+            break;
+        }
+        case substrait::Expression_Literal::kStruct: {
+            const auto & fields = literal.struct_().fields();
+
+            DataTypes types;
+            types.reserve(fields.size());
+            Tuple tuple;
+            tuple.reserve(fields.size());
+            for (const auto & f : fields)
+            {
+                DataTypePtr field_type;
+                Field field_value;
+                std::tie(field_type, field_value) = parseLiteral(f);
+
+                types.emplace_back(std::move(field_type));
+                tuple.emplace_back(std::move(field_value));
+            }
+
+            type = std::make_shared<DataTypeTuple>(types);
+            field = std::move(tuple);
             break;
         }
         case substrait::Expression_Literal::kNull: {
