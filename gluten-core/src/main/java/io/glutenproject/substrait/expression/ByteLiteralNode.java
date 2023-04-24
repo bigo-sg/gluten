@@ -17,10 +17,10 @@
 
 package io.glutenproject.substrait.expression;
 
-import org.apache.spark.sql.types.*;
+import io.glutenproject.substrait.type.I8TypeNode;
 
 public class ByteLiteralNode extends ScalarLiteralNode<Byte> {
   public ByteLiteralNode(Byte value) {
-    super(value, new ByteType());
+    super(value, new I8TypeNode(true));
   }
 }

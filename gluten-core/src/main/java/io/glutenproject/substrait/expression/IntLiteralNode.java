@@ -17,10 +17,10 @@
 
 package io.glutenproject.substrait.expression;
 
-import org.apache.spark.sql.types.*;
+import io.glutenproject.substrait.type.I32TypeNode;
 
 public class IntLiteralNode extends ScalarLiteralNode<Integer> {
   public IntLiteralNode(Integer value) {
-    super(value, new IntegerType());
+    super(value, new I32TypeNode(true));
   }
 }

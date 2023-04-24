@@ -10,7 +10,7 @@ public class MapNode implements TypeNode, Serializable {
   private final TypeNode keyType;
   private final TypeNode valType;
 
-  MapNode(Boolean nullable, TypeNode keyType, TypeNode valType) {
+  public MapNode(Boolean nullable, TypeNode keyType, TypeNode valType) {
     this.nullable = nullable;
     this.keyType = keyType;
     this.valType = valType;

@@ -17,10 +17,10 @@
 
 package io.glutenproject.substrait.expression;
 
-import org.apache.spark.sql.types.*;
+import io.glutenproject.substrait.type.BinaryTypeNode;
 
 public class BinaryLiteralNode extends ScalarLiteralNode<byte[]> {
   public BinaryLiteralNode(byte[] value) {
-    super(value, new BinaryType());
+    super(value, new BinaryTypeNode(true));
   }
 }

@@ -19,25 +19,25 @@ package io.glutenproject.substrait.expression;
 
 import io.substrait.proto.Expression;
 
-import java.io.Serializable;
+import io.glutenproject.substrait.type.TypeNode;
 
-import org.apache.spark.sql.types.*;
+import java.io.Serializable;
 
 abstract public class LiteralNode<T> implements ExpressionNode, Serializable {
   private final T value;
-  private final DataType dataType;
+  private final TypeNode typeNode;
 
-  public LiteralNode(T value, DataType dateType) {
+  public LiteralNode(T value, TypeNode typeNode) {
     this.value = value;
-    this.dataType = dateType;
+    this.typeNode = typeNode;
   }
 
   public T getValue() {
     return value;
   }
 
-  public DataType getDataType() {
-    return dataType;
+  public TypeNode getTypeNode() {
+    return typeNode;
   }
 
   protected abstract Expression.Literal getLiteral();

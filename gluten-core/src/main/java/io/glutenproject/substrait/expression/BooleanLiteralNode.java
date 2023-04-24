@@ -17,10 +17,10 @@
 
 package io.glutenproject.substrait.expression;
 
-import org.apache.spark.sql.types.*;
+import io.glutenproject.substrait.type.BooleanTypeNode;
 
 public class BooleanLiteralNode extends ScalarLiteralNode<Boolean> {
   public BooleanLiteralNode(Boolean value) {
-    super(value, new BooleanType());
+    super(value, new BooleanTypeNode(true));
   }
 }

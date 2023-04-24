@@ -17,10 +17,10 @@
 
 package io.glutenproject.substrait.expression;
 
-import org.apache.spark.sql.types.*;
+import io.glutenproject.substrait.type.FP32TypeNode;
 
 public class FloatLiteralNode extends ScalarLiteralNode<Float> {
   public FloatLiteralNode(Float value) {
-    super(value, new FloatType());
+    super(value, new FP32TypeNode(true));
   }
 }

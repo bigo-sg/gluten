@@ -26,7 +26,7 @@ public class StructNode implements TypeNode, Serializable {
   private final Boolean nullable;
   private final ArrayList<TypeNode> types = new ArrayList<>();
 
-  StructNode(Boolean nullable, ArrayList<TypeNode> types) {
+  public StructNode(Boolean nullable, ArrayList<TypeNode> types) {
     this.nullable = nullable;
     this.types.addAll(types);
   }

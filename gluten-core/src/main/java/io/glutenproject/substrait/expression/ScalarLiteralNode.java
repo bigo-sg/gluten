@@ -4,45 +4,45 @@ import io.substrait.proto.Expression;
 
 import com.google.protobuf.ByteString;
 
-import org.apache.spark.sql.types.*;
+import io.glutenproject.substrait.type.*;
 
 public class ScalarLiteralNode<T> extends LiteralNode<T> {
-  public ScalarLiteralNode(T value, DataType dateType) {
-    super(value, dateType);
+  public ScalarLiteralNode(T value, TypeNode typeNode) {
+    super(value, typeNode);
   }
 
   @Override
   protected Expression.Literal getLiteral() {
     T value = getValue();
-    DataType dataType = getDataType();
+    TypeNode typeNode = getTypeNode();
     Expression.Literal.Builder literalBuilder = Expression.Literal.newBuilder();
 
-    if (dataType instanceof BooleanType) {
+    if (typeNode instanceof BooleanTypeNode) {
       literalBuilder.setBoolean((Boolean) value);
-    } else if (dataType instanceof ByteType) {
+    } else if (typeNode instanceof I8TypeNode) {
       literalBuilder.setI8((Byte) value);
-    } else if (dataType instanceof ShortType) {
+    } else if (typeNode instanceof I16TypeNode) {
       literalBuilder.setI16((Short) value);
-    } else if (dataType instanceof IntegerType) {
+    } else if (typeNode instanceof I32TypeNode) {
       literalBuilder.setI32((Integer) value);
-    } else if (dataType instanceof LongType) {
+    } else if (typeNode instanceof I64TypeNode) {
       literalBuilder.setI64((Long) value);
-    } else if (dataType instanceof FloatType) {
+    } else if (typeNode instanceof FP32TypeNode) {
       literalBuilder.setFp32((Float) value);
-    } else if (dataType instanceof DoubleType) {
+    } else if (typeNode instanceof FP64TypeNode) {
       literalBuilder.setFp64((Double) value);
-    } else if (dataType instanceof StringType) {
+    } else if (typeNode instanceof StringTypeNode) {
       literalBuilder.setString((String) value);
-    } else if (dataType instanceof BinaryType) {
+    } else if (typeNode instanceof BinaryTypeNode) {
       literalBuilder.setBinary(ByteString.copyFrom((byte[]) value));
-    } else if (dataType instanceof DateType) {
+    } else if (typeNode instanceof DateTypeNode) {
       literalBuilder.setDate((Integer) value);
-    } else if (dataType instanceof TimestampType) {
+    } else if (typeNode instanceof TimestampTypeNode) {
       literalBuilder.setTimestamp((Long) value);
     } else {
       throw new UnsupportedOperationException(
           String.format("Type not supported: %s, obj: %s, class: %s",
-              dataType.toString(), value.toString(), value.getClass().toString()));
+              typeNode.toString(), value.toString(), value.getClass().toString()));
     }
 
     return literalBuilder.build();

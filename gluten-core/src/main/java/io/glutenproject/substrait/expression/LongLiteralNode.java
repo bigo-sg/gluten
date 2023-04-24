@@ -17,11 +17,11 @@
 
 package io.glutenproject.substrait.expression;
 
-import org.apache.spark.sql.types.*;
+import io.glutenproject.substrait.type.I64TypeNode;
 
 public class LongLiteralNode extends ScalarLiteralNode<Long> {
   public LongLiteralNode(Long value) {
-    super(value, new LongType());
+    super(value, new I64TypeNode(true));
   }
 }
 

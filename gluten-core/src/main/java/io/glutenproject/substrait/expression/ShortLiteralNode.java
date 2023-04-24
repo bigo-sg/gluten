@@ -17,10 +17,10 @@
 
 package io.glutenproject.substrait.expression;
 
-import org.apache.spark.sql.types.*;
+import io.glutenproject.substrait.type.I16TypeNode;
 
 public class ShortLiteralNode extends ScalarLiteralNode<Short> {
   public ShortLiteralNode(Short value) {
-    super(value, new ShortType());
+    super(value, new I16TypeNode(true));
   }
 }

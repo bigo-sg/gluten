@@ -17,10 +17,10 @@
 
 package io.glutenproject.substrait.expression;
 
-import org.apache.spark.sql.types.*;
+import io.glutenproject.substrait.type.DateTypeNode;
 
 public class DateLiteralNode extends ScalarLiteralNode<Integer> {
   public DateLiteralNode(Integer value) {
-    super(value, new DateType());
+    super(value, new DateTypeNode(true));
   }
 }

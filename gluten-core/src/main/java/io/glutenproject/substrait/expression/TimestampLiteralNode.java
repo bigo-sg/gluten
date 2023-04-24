@@ -17,10 +17,10 @@
 
 package io.glutenproject.substrait.expression;
 
-import org.apache.spark.sql.types.*;
+import io.glutenproject.substrait.type.TimestampTypeNode;
 
 public class TimestampLiteralNode extends ScalarLiteralNode<Long> {
   public TimestampLiteralNode(Long value) {
-    super(value, new TimestampType());
+    super(value, new TimestampTypeNode(true));
   }
 }

@@ -17,10 +17,10 @@
 
 package io.glutenproject.substrait.expression;
 
-import org.apache.spark.sql.types.*;
+import io.glutenproject.substrait.type.FP64TypeNode;
 
 public class DoubleLiteralNode extends ScalarLiteralNode<Double> {
   public DoubleLiteralNode(Double value) {
-    super(value, new DoubleType());
+    super(value, new FP64TypeNode(true));
   }
 }
