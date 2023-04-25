@@ -20,20 +20,17 @@ package io.glutenproject.substrait.expression;
 import org.apache.spark.sql.catalyst.util.GenericArrayData;
 
 import io.substrait.proto.Expression;
-
+import io.substrait.proto.Expression.Literal.Builder;
 import io.glutenproject.substrait.type.TypeNode;
 import io.glutenproject.substrait.type.ListNode;
 
-class ListLiteralNode extends LiteralNode {
-  private final GenericArrayData array;
-
+class ListLiteralNode extends LiteralNodeWithValue<GenericArrayData> {
   public ListLiteralNode(GenericArrayData array, TypeNode typeNode) {
-    super(typeNode);
-    this.array = array;
+    super(array, typeNode);
   }
 
   @Override
-  protected Expression.Literal getLiteral() {
+  protected void updateLiteralBuilder(Builder literalBuilder, GenericArrayData array) {
     Object[] elements = array.array();
     TypeNode elementType = ((ListNode) getTypeNode()).getNestedType();
 
@@ -44,8 +41,6 @@ class ListLiteralNode extends LiteralNode {
       listBuilder.addValues(elementExpr);
     }
 
-    Expression.Literal.Builder literalBuilder = Expression.Literal.newBuilder();
     literalBuilder.setList(listBuilder.build());
-    return literalBuilder.build();
   }
 }

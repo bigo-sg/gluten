@@ -20,22 +20,20 @@ package io.glutenproject.substrait.expression;
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow;
 
 import io.substrait.proto.Expression;
+import io.substrait.proto.Expression.Literal.Builder;
 import io.glutenproject.substrait.type.TypeNode;
 import io.glutenproject.substrait.type.StructNode;
 
 import java.util.ArrayList;
 
-class StructLiteralNode extends LiteralNode {
-  private final GenericInternalRow row;
-
+class StructLiteralNode extends LiteralNodeWithValue<GenericInternalRow> {
   public StructLiteralNode(GenericInternalRow row, TypeNode typeNode) {
-    super(typeNode);
-    this.row= row;
+    super(row, typeNode);
   }
 
   @Override
-  protected Expression.Literal getLiteral() {
-    ArrayList<TypeNode> fieldTypes = ((StructNode)getTypeNode()).getFieldTypes();
+  protected void updateLiteralBuilder(Builder literalBuilder, GenericInternalRow row) {
+    ArrayList<TypeNode> fieldTypes = ((StructNode) getTypeNode()).getFieldTypes();
     Object[] values = row.values();
 
     Expression.Literal.Struct.Builder structBuilder = Expression.Literal.Struct.newBuilder();
@@ -45,9 +43,7 @@ class StructLiteralNode extends LiteralNode {
       structBuilder.addFields(element);
     }
 
-    Expression.Literal.Builder literalBuilder = Expression.Literal.newBuilder();
     literalBuilder.setStruct(structBuilder.build());
-    return literalBuilder.build();
   }
 }
 

@@ -50,76 +50,104 @@ public class ExpressionBuilder {
     return new NullLiteralNode(typeNode);
   }
 
-  public static BooleanLiteralNode makeBooleanLiteral(Boolean booleanConstant) {
-    return new BooleanLiteralNode(booleanConstant);
+  public static BooleanLiteralNode makeBooleanLiteral(Boolean vBool) {
+    return new BooleanLiteralNode(vBool);
   }
 
-  public static IntLiteralNode makeIntLiteral(Integer intConstant) {
-    return new IntLiteralNode(intConstant);
+  public static BooleanLiteralNode makeBooleanLiteral(Boolean vBool, TypeNode typeNode) {
+    return new BooleanLiteralNode(vBool, typeNode);
   }
 
-  public static IntListNode makeIntList(ArrayList<Integer> intConstants) {
-    return new IntListNode(intConstants);
+  public static IntLiteralNode makeIntLiteral(Integer vInt) {
+    return new IntLiteralNode(vInt);
   }
 
-  public static ByteLiteralNode makeByteLiteral(Byte byteConstant) {
-    return new ByteLiteralNode(byteConstant);
+  public static IntLiteralNode makeIntLiteral(Integer vInt, TypeNode typeNode) {
+    return new IntLiteralNode(vInt, typeNode);
   }
 
-  public static ShortLiteralNode makeShortLiteral(Short shortConstant) {
-    return new ShortLiteralNode(shortConstant);
+  public static ByteLiteralNode makeByteLiteral(Byte vByte) {
+    return new ByteLiteralNode(vByte);
   }
 
-  public static LongLiteralNode makeLongLiteral(Long longConstant) {
-    return new LongLiteralNode(longConstant);
+  public static ByteLiteralNode makeByteLiteral(Byte vByte, TypeNode typeNode) {
+    return new ByteLiteralNode(vByte, typeNode);
   }
 
-  public static LongListNode makeLongList(ArrayList<Long> longConstants) {
-    return new LongListNode(longConstants);
+  public static ShortLiteralNode makeShortLiteral(Short vShort) {
+    return new ShortLiteralNode(vShort);
   }
 
-  public static DoubleLiteralNode makeDoubleLiteral(Double doubleConstant) {
-    return new DoubleLiteralNode(doubleConstant);
+  public static ShortLiteralNode makeShortLiteral(Short vShort, TypeNode typeNode) {
+    return new ShortLiteralNode(vShort, typeNode);
   }
 
-  public static DoubleListNode makeDoubleList(ArrayList<Double> doubleConstants) {
-    return new DoubleListNode(doubleConstants);
+  public static LongLiteralNode makeLongLiteral(Long vLong) {
+    return new LongLiteralNode(vLong);
   }
 
-  public static FloatLiteralNode makeFloatLiteral(Float floatConstant) {
-    return new FloatLiteralNode(floatConstant);
+  public static LongLiteralNode makeLongLiteral(Long vLong, TypeNode typeNode) {
+    return new LongLiteralNode(vLong, typeNode);
   }
 
-  public static DateLiteralNode makeDateLiteral(Integer dateConstant) {
-    return new DateLiteralNode(dateConstant);
+  public static DoubleLiteralNode makeDoubleLiteral(Double vDouble) {
+    return new DoubleLiteralNode(vDouble);
   }
 
-  public static DateListNode makeDateList(ArrayList<Integer> dateConstants) {
-    return new DateListNode(dateConstants);
+  public static DoubleLiteralNode makeDoubleLiteral(Double vDouble, TypeNode typeNode) {
+    return new DoubleLiteralNode(vDouble, typeNode);
   }
 
-  public static TimestampLiteralNode makeTimestampLiteral(Long tsConstants) {
-    return new TimestampLiteralNode(tsConstants);
+  public static FloatLiteralNode makeFloatLiteral(Float vFloat) {
+    return new FloatLiteralNode(vFloat);
   }
 
-  public static StringLiteralNode makeStringLiteral(String strConstant) {
-    return new StringLiteralNode(strConstant);
+  public static FloatLiteralNode makeFloatLiteral(Float vFloat, TypeNode typeNode) {
+    return new FloatLiteralNode(vFloat, typeNode);
   }
 
-  public static StringListNode makeStringList(ArrayList<String> strConstants) {
-    return new StringListNode(strConstants);
+  public static DateLiteralNode makeDateLiteral(Integer vDate) {
+    return new DateLiteralNode(vDate);
+  }
+
+  public static DateLiteralNode makeDateLiteral(Integer vDate, TypeNode typeNode) {
+    return new DateLiteralNode(vDate, typeNode);
+  }
+
+  public static TimestampLiteralNode makeTimestampLiteral(Long vTimestamp) {
+    return new TimestampLiteralNode(vTimestamp);
+  }
+
+  public static TimestampLiteralNode makeTimestampLiteral(Long vTimestamp, TypeNode typeNode) {
+    return new TimestampLiteralNode(vTimestamp, typeNode);
+  }
+
+  public static StringLiteralNode makeStringLiteral(String vString) {
+    return new StringLiteralNode(vString);
+  }
+
+  public static StringLiteralNode makeStringLiteral(String vString, TypeNode typeNode) {
+    return new StringLiteralNode(vString, typeNode);
   }
 
   public static BinaryStructNode makeBinaryStruct(byte[][] binary, StructType type) {
     return new BinaryStructNode(binary, type);
   }
 
-  public static BinaryLiteralNode makeBinaryLiteral(byte[] bytesConstant) {
-    return new BinaryLiteralNode(bytesConstant);
+  public static BinaryLiteralNode makeBinaryLiteral(byte[] vBytes) {
+    return new BinaryLiteralNode(vBytes);
   }
 
-  public static DecimalLiteralNode makeDecimalLiteral(Decimal decimalConstant) {
-    return new DecimalLiteralNode(decimalConstant);
+  public static BinaryLiteralNode makeBinaryLiteral(byte[] vBytes, TypeNode typeNode) {
+    return new BinaryLiteralNode(vBytes, typeNode);
+  }
+
+  public static DecimalLiteralNode makeDecimalLiteral(Decimal vDecimal) {
+    return new DecimalLiteralNode(vDecimal);
+  }
+
+  public static DecimalLiteralNode makeDecimalLiteral(Decimal vDecimal, TypeNode typeNode) {
+    return new DecimalLiteralNode(vDecimal, typeNode);
   }
 
   public static ListLiteralNode makeListLiteral(GenericArrayData array, TypeNode typeNode) {
@@ -140,31 +168,31 @@ public class ExpressionBuilder {
     }
 
     if (typeNode instanceof BooleanTypeNode) {
-      return makeBooleanLiteral((Boolean) obj);
+      return makeBooleanLiteral((Boolean) obj, typeNode);
     } else if (typeNode instanceof I8TypeNode) {
-      return makeByteLiteral((Byte) obj);
+      return makeByteLiteral((Byte) obj, typeNode);
     } else if (typeNode instanceof I16TypeNode) {
-      return makeShortLiteral((Short) obj);
+      return makeShortLiteral((Short) obj, typeNode);
     } else if (typeNode instanceof I32TypeNode) {
-      return makeIntLiteral((Integer) obj);
+      return makeIntLiteral((Integer) obj, typeNode);
     } else if (typeNode instanceof I64TypeNode) {
-      return makeLongLiteral((Long) obj);
+      return makeLongLiteral((Long) obj, typeNode);
     } else if (typeNode instanceof FP32TypeNode) {
-      return makeFloatLiteral((Float) obj);
+      return makeFloatLiteral((Float) obj, typeNode);
     } else if (typeNode instanceof FP64TypeNode) {
-      return makeDoubleLiteral((Double) obj);
+      return makeDoubleLiteral((Double) obj, typeNode);
     } else if (typeNode instanceof DateTypeNode) {
-      return makeDateLiteral((Integer) obj);
+      return makeDateLiteral((Integer) obj, typeNode);
     } else if (typeNode instanceof TimestampTypeNode) {
-      return makeTimestampLiteral((Long) obj);
+      return makeTimestampLiteral((Long) obj, typeNode);
     } else if (typeNode instanceof StringTypeNode) {
-      return makeStringLiteral(obj.toString());
+      return makeStringLiteral((String) obj, typeNode);
     } else if (typeNode instanceof BinaryTypeNode) {
-      return makeBinaryLiteral((byte[]) obj);
+      return makeBinaryLiteral((byte[]) obj, typeNode);
     } else if (typeNode instanceof DecimalTypeNode) {
       Decimal decimal = (Decimal) obj;
       checkDecimalScale(decimal.scale());
-      return makeDecimalLiteral(decimal);
+      return makeDecimalLiteral(decimal, typeNode);
     } else if (typeNode instanceof ListNode) {
       return makeListLiteral((GenericArrayData) obj, typeNode);
     } else if (typeNode instanceof MapNode) {

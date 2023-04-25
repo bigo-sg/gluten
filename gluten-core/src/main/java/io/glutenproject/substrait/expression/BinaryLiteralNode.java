@@ -18,9 +18,22 @@
 package io.glutenproject.substrait.expression;
 
 import io.glutenproject.substrait.type.BinaryTypeNode;
+import io.glutenproject.substrait.type.TypeNode;
+import io.substrait.proto.Expression.Literal.Builder;
 
-public class BinaryLiteralNode extends ScalarLiteralNode<byte[]> {
+import com.google.protobuf.ByteString;
+
+public class BinaryLiteralNode extends LiteralNodeWithValue<byte[]> {
   public BinaryLiteralNode(byte[] value) {
     super(value, new BinaryTypeNode(true));
+  }
+
+  public BinaryLiteralNode(byte[] value, TypeNode typeNode) {
+    super(value, typeNode);
+  }
+
+  @Override
+  protected void updateLiteralBuilder(Builder literalBuilder, byte[] value) {
+    literalBuilder.setBinary(ByteString.copyFrom(value));
   }
 }

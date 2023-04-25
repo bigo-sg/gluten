@@ -18,10 +18,21 @@
 package io.glutenproject.substrait.expression;
 
 import io.glutenproject.substrait.type.I64TypeNode;
+import io.glutenproject.substrait.type.TypeNode;
+import io.substrait.proto.Expression.Literal.Builder;
 
-public class LongLiteralNode extends ScalarLiteralNode<Long> {
+public class LongLiteralNode extends LiteralNodeWithValue<Long> {
   public LongLiteralNode(Long value) {
     super(value, new I64TypeNode(true));
+  }
+
+  public LongLiteralNode(Long value, TypeNode typeNode) {
+    super(value, typeNode);
+  }
+
+  @Override
+  protected void updateLiteralBuilder(Builder literalBuilder, Long value) {
+    literalBuilder.setI64(value);
   }
 }
 

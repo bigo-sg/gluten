@@ -18,9 +18,20 @@
 package io.glutenproject.substrait.expression;
 
 import io.glutenproject.substrait.type.FP64TypeNode;
+import io.glutenproject.substrait.type.TypeNode;
+import io.substrait.proto.Expression.Literal.Builder;
 
-public class DoubleLiteralNode extends ScalarLiteralNode<Double> {
+public class DoubleLiteralNode extends LiteralNodeWithValue<Double> {
   public DoubleLiteralNode(Double value) {
     super(value, new FP64TypeNode(true));
+  }
+
+  public DoubleLiteralNode(Double value, TypeNode typeNode) {
+    super(value, typeNode);
+  }
+
+  @Override
+  protected void updateLiteralBuilder(Builder literalBuilder, Double value) {
+    literalBuilder.setFp64(value);
   }
 }

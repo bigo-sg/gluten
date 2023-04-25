@@ -15,42 +15,37 @@
  * limitations under the License.
  */
 
- package io.glutenproject.substrait.expression;
+package io.glutenproject.substrait.expression;
 
- import org.apache.derby.iapi.sql.compile.ExpressionClassBuilderInterface;
 import org.apache.spark.sql.catalyst.util.ArrayBasedMapData;
- 
- import io.substrait.proto.Expression;
- 
- import io.glutenproject.substrait.type.TypeNode;
- import io.glutenproject.substrait.type.MapNode;
 
- class MapLiteralNode extends LiteralNode {
-   private final ArrayBasedMapData map;
+import io.substrait.proto.Expression;
+import io.substrait.proto.Expression.Literal.Builder;
+import io.glutenproject.substrait.type.TypeNode;
+import io.glutenproject.substrait.type.MapNode;
 
-   public MapLiteralNode(ArrayBasedMapData map, TypeNode typeNode) {
-     super(typeNode);
-     this.map = map;
-   }
+class MapLiteralNode extends LiteralNodeWithValue<ArrayBasedMapData> {
 
-   @Override
-   protected Expression.Literal getLiteral() {
-     Object[] keys = map.keyArray().array();
-     Object[] values = map.valueArray().array();
+  public MapLiteralNode(ArrayBasedMapData map, TypeNode typeNode) {
+    super(map, typeNode);
+  }
 
-     Expression.Literal.Map.Builder mapBuilder = Expression.Literal.Map.newBuilder();
-     for (int i = 0; i < keys.length; ++i) {
-       LiteralNode keyNode = ExpressionBuilder.makeLiteral(keys[i], ((MapNode) getTypeNode()).getKeyType());
-       LiteralNode valueNode = ExpressionBuilder.makeLiteral(values[i], ((MapNode) getTypeNode()).getValueType());
+	@Override
+	protected void updateLiteralBuilder(Builder literalBuilder, ArrayBasedMapData map) {
+    Object[] keys = map.keyArray().array();
+    Object[] values = map.valueArray().array();
 
-       Expression.Literal.Map.KeyValue.Builder kvBuilder = Expression.Literal.Map.KeyValue.newBuilder();
-       kvBuilder.setKey(keyNode.getLiteral());
-       kvBuilder.setValue(valueNode.getLiteral());
-       mapBuilder.addKeyValues(kvBuilder.build());
-     }
+    Expression.Literal.Map.Builder mapBuilder = Expression.Literal.Map.newBuilder();
+    for (int i = 0; i < keys.length; ++i) {
+      LiteralNode keyNode = ExpressionBuilder.makeLiteral(keys[i], ((MapNode) getTypeNode()).getKeyType());
+      LiteralNode valueNode = ExpressionBuilder.makeLiteral(values[i], ((MapNode) getTypeNode()).getValueType());
 
-     Expression.Literal.Builder literalBuilder = Expression.Literal.newBuilder();
-     literalBuilder.setMap(mapBuilder.build());
-     return literalBuilder.build();
-   }
- }
+      Expression.Literal.Map.KeyValue.Builder kvBuilder = Expression.Literal.Map.KeyValue.newBuilder();
+      kvBuilder.setKey(keyNode.getLiteral());
+      kvBuilder.setValue(valueNode.getLiteral());
+      mapBuilder.addKeyValues(kvBuilder.build());
+    }
+
+    literalBuilder.setMap(mapBuilder.build());
+	}
+}

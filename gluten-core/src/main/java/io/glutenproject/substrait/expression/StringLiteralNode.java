@@ -18,9 +18,20 @@
 package io.glutenproject.substrait.expression;
 
 import io.glutenproject.substrait.type.StringTypeNode;
+import io.glutenproject.substrait.type.TypeNode;
+import io.substrait.proto.Expression.Literal.Builder;
 
-public class StringLiteralNode extends ScalarLiteralNode<String> {
+public class StringLiteralNode extends LiteralNodeWithValue<String> {
   public StringLiteralNode(String value) {
     super(value, new StringTypeNode(true));
+  }
+
+  public StringLiteralNode(String value, TypeNode typeNode) {
+    super(value, typeNode);
+  }
+
+  @Override
+  protected void updateLiteralBuilder(Builder literalBuilder, String value) {
+    literalBuilder.setString(value);
   }
 }

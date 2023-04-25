@@ -18,9 +18,21 @@
 package io.glutenproject.substrait.expression;
 
 import io.glutenproject.substrait.type.TimestampTypeNode;
+import io.glutenproject.substrait.type.TypeNode;
 
-public class TimestampLiteralNode extends ScalarLiteralNode<Long> {
+import io.substrait.proto.Expression.Literal.Builder;
+
+public class TimestampLiteralNode extends LiteralNodeWithValue<Long> {
   public TimestampLiteralNode(Long value) {
     super(value, new TimestampTypeNode(true));
+  }
+
+  public TimestampLiteralNode(Long value, TypeNode typeNode) {
+    super(value, typeNode);
+  }
+
+  @Override
+  protected void updateLiteralBuilder(Builder literalBuilder, Long value) {
+    literalBuilder.setTimestamp(value);
   }
 }

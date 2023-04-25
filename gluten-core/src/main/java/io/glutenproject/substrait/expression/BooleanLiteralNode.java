@@ -18,9 +18,21 @@
 package io.glutenproject.substrait.expression;
 
 import io.glutenproject.substrait.type.BooleanTypeNode;
+import io.glutenproject.substrait.type.TypeNode;
 
-public class BooleanLiteralNode extends ScalarLiteralNode<Boolean> {
+import io.substrait.proto.Expression.Literal.Builder;
+
+public class BooleanLiteralNode extends LiteralNodeWithValue<Boolean> {
   public BooleanLiteralNode(Boolean value) {
     super(value, new BooleanTypeNode(true));
+  }
+
+  public BooleanLiteralNode(Boolean value, TypeNode typeNode) {
+    super(value, typeNode);
+  }
+
+  @Override
+  protected void updateLiteralBuilder(Builder literalBuilder, Boolean value) {
+    literalBuilder.setBoolean(value);
   }
 }

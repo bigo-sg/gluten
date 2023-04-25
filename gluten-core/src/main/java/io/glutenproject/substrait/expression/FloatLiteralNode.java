@@ -18,9 +18,21 @@
 package io.glutenproject.substrait.expression;
 
 import io.glutenproject.substrait.type.FP32TypeNode;
+import io.glutenproject.substrait.type.TypeNode;
 
-public class FloatLiteralNode extends ScalarLiteralNode<Float> {
+import io.substrait.proto.Expression.Literal.Builder;
+
+public class FloatLiteralNode extends LiteralNodeWithValue<Float> {
   public FloatLiteralNode(Float value) {
     super(value, new FP32TypeNode(true));
+  }
+
+  public FloatLiteralNode(Float value, TypeNode typeNode) {
+    super(value, typeNode);
+  }
+
+  @Override
+  protected void updateLiteralBuilder(Builder literalBuilder, Float value) {
+    literalBuilder.setFp32(value);
   }
 }

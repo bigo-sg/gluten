@@ -18,9 +18,20 @@
 package io.glutenproject.substrait.expression;
 
 import io.glutenproject.substrait.type.I32TypeNode;
+import io.glutenproject.substrait.type.TypeNode;
+import io.substrait.proto.Expression.Literal.Builder;
 
-public class IntLiteralNode extends ScalarLiteralNode<Integer> {
+public class IntLiteralNode extends LiteralNodeWithValue<Integer> {
   public IntLiteralNode(Integer value) {
     super(value, new I32TypeNode(true));
+  }
+
+  public IntLiteralNode(Integer value, TypeNode typeNode) {
+    super(value, typeNode);
+  }
+
+  @Override
+  protected void updateLiteralBuilder(Builder literalBuilder, Integer value) {
+    literalBuilder.setI32(value);
   }
 }

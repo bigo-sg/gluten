@@ -18,9 +18,21 @@
 package io.glutenproject.substrait.expression;
 
 import io.glutenproject.substrait.type.I8TypeNode;
+import io.glutenproject.substrait.type.TypeNode;
 
-public class ByteLiteralNode extends ScalarLiteralNode<Byte> {
+import io.substrait.proto.Expression.Literal.Builder;
+
+public class ByteLiteralNode extends LiteralNodeWithValue<Byte> {
   public ByteLiteralNode(Byte value) {
     super(value, new I8TypeNode(true));
+  }
+
+  public ByteLiteralNode(Byte value, TypeNode typeNode) {
+    super(value, typeNode);
+  }
+
+  @Override
+  protected void updateLiteralBuilder(Builder literalBuilder, Byte value) {
+    literalBuilder.setI8(value);
   }
 }

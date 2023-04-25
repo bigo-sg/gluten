@@ -18,9 +18,20 @@
 package io.glutenproject.substrait.expression;
 
 import io.glutenproject.substrait.type.DateTypeNode;
+import io.glutenproject.substrait.type.TypeNode;
+import io.substrait.proto.Expression.Literal.Builder;
 
-public class DateLiteralNode extends ScalarLiteralNode<Integer> {
+public class DateLiteralNode extends LiteralNodeWithValue<Integer> {
   public DateLiteralNode(Integer value) {
     super(value, new DateTypeNode(true));
+  }
+
+  public DateLiteralNode(Integer value, TypeNode typeNode) {
+    super(value, typeNode);
+  }
+
+  @Override
+  protected void updateLiteralBuilder(Builder literalBuilder, Integer value) {
+    literalBuilder.setDate(value);
   }
 }
