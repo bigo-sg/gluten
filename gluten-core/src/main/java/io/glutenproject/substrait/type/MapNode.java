@@ -24,6 +24,14 @@ public class MapNode implements TypeNode, Serializable {
     return TypeBuilder.makeStruct(false, types);
   }
 
+  public TypeNode getKeyType() {
+    return keyType;
+  }
+
+  public TypeNode getValueType() {
+    return valType;
+  }
+
   @Override
   public Type toProtobuf() {
     Type.Map.Builder mapBuilder = Type.Map.newBuilder();

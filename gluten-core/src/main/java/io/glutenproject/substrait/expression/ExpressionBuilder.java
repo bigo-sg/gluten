@@ -24,6 +24,7 @@ import scala.Tuple2;
 
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.catalyst.util.GenericArrayData;
+import org.apache.spark.sql.catalyst.util.ArrayBasedMapData;
 import org.apache.spark.sql.types.*;
 import org.apache.spark.unsafe.types.UTF8String;
 
@@ -127,6 +128,10 @@ public class ExpressionBuilder {
     return new ListLiteralNode(array, typeNode);
   }
 
+  public static MapLiteralNode makeMapLiteral(ArrayBasedMapData map, TypeNode typeNode) {
+    return new MapLiteralNode(map, typeNode);
+  }
+
   public static LiteralNode makeLiteral(Object obj, TypeNode typeNode) {
     Tuple2<DataType, Object> typeInfo = ConverterUtils.parseFromSubstraitType(typeNode.toProtobuf());
     return makeLiteral(obj, typeInfo._1(), (Boolean) typeInfo._2());
@@ -218,18 +223,14 @@ public class ExpressionBuilder {
       } else {
         return makeListLiteral((GenericArrayData) obj, typeNode);
       }
-    /*
     } else if (dataType instanceof MapType) {
+      TypeNode typeNode = ConverterUtils.getTypeNode(dataType, nullable);
       if (obj == null) {
-        MapType mapType = (MapType) dataType;
-        TypeNode keyType = ConverterUtils.getTypeNode(mapType.keyType(), false);
-        TypeNode valType = ConverterUtils.getTypeNode(mapType.valueType(),
-         mapType.valueContainsNull());
-        return makeNullLiteral(TypeBuilder.makeMap(nullable, keyType, valType));
+        return makeNullLiteral(typeNode);
       } else {
-          throw new UnsupportedOperationException(
-            String.format("Type not supported: %s.", dataType.toString()));
+        return makeMapLiteral((ArrayBasedMapData) obj, typeNode);
       }
+    /*
     } else if (dataType instanceof NullType) {
         return makeNullLiteral(TypeBuilder.makeNothing());
     } else  if (dataType instanceof StructType) {
