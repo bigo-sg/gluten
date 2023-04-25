@@ -31,6 +31,10 @@ public class StructNode implements TypeNode, Serializable {
     this.types.addAll(types);
   }
 
+  public ArrayList<TypeNode> getFieldTypes() {
+    return types;
+  }
+
   @Override
   public Type toProtobuf() {
     Type.Struct.Builder structBuilder = Type.Struct.newBuilder();
