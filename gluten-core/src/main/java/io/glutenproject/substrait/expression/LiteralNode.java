@@ -27,7 +27,7 @@ abstract class LiteralNode<T> implements ExpressionNode, Serializable {
   private final T value;
   private final TypeNode typeNode;
 
-  public LiteralNode(T value, TypeNode typeNode) {
+  LiteralNode(T value, TypeNode typeNode) {
     this.value = value;
     this.typeNode = typeNode;
   }
