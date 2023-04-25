@@ -20,6 +20,8 @@ package io.glutenproject.substrait.expression;
 import io.glutenproject.expression.ConverterUtils;
 import io.glutenproject.substrait.type.TypeBuilder;
 import io.glutenproject.substrait.type.TypeNode;
+import scala.Tuple2;
+
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.catalyst.util.GenericArrayData;
 import org.apache.spark.sql.types.*;
@@ -121,7 +123,16 @@ public class ExpressionBuilder {
     return new DecimalLiteralNode(decimalConstant);
   }
 
-  public static ExpressionNode makeLiteral(Object obj, DataType dataType, Boolean nullable) {
+  public static ListLiteralNode makeListLiteral(GenericArrayData array, TypeNode typeNode) {
+    return new ListLiteralNode(array, typeNode);
+  }
+
+  public static LiteralNode makeLiteral(Object obj, TypeNode typeNode) {
+    Tuple2<DataType, Object> typeInfo = ConverterUtils.parseFromSubstraitType(typeNode.toProtobuf());
+    return makeLiteral(obj, typeInfo._1(), (Boolean) typeInfo._2());
+  }
+
+  public static LiteralNode makeLiteral(Object obj, DataType dataType, Boolean nullable) {
     if (dataType instanceof BooleanType) {
       if (obj == null) {
         return makeNullLiteral(TypeBuilder.makeBoolean(nullable));
@@ -200,23 +211,14 @@ public class ExpressionBuilder {
         return makeDecimalLiteral(decimal);
       }
     } else if (dataType instanceof ArrayType) {
+      TypeNode typeNode = ConverterUtils.getTypeNode(dataType, nullable);
       if (obj == null) {
         ArrayType arrayType = (ArrayType)dataType;
-        return makeNullLiteral(TypeBuilder.makeList(nullable,
-                ConverterUtils.getTypeNode(arrayType.elementType(), nullable)));
+        return makeNullLiteral(typeNode);
       } else {
-        Object[] elements = ((GenericArrayData) obj).array();
-        ArrayList<String> list = new ArrayList<>();
-        for (Object element : elements) {
-          if (element instanceof UTF8String) {
-            list.add(element.toString());
-          } else {
-            throw new UnsupportedOperationException(
-                    String.format("Type not supported: %s.", dataType.toString()));
-          }
-        }
-        return makeStringList(list);
+        return makeListLiteral((GenericArrayData) obj, typeNode);
       }
+    /*
     } else if (dataType instanceof MapType) {
       if (obj == null) {
         MapType mapType = (MapType) dataType;
@@ -250,6 +252,7 @@ public class ExpressionBuilder {
         }
         return makeBinaryStruct(binarys, type);
       }
+    */
     } else {
       /// TODO(taiyang-li) implement Literal Node for Struct/Map/Array
       throw new UnsupportedOperationException(
