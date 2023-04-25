@@ -18,13 +18,7 @@
 package io.glutenproject.substrait.expression;
 
 import io.glutenproject.substrait.type.TypeNode;
-import io.glutenproject.expression.ConverterUtils;
 import io.substrait.proto.Expression;
-import io.substrait.proto.Expression.Literal;
-
-import java.io.Serializable;
-
-import org.apache.spark.sql.types.DataType;
 
 public class NullLiteralNode extends LiteralNode {
   public NullLiteralNode(TypeNode typeNode) {

@@ -19,9 +19,7 @@ package io.glutenproject.substrait.expression;
 
 import com.google.protobuf.ByteString;
 
-import io.glutenproject.substrait.type.DecimalTypeNode;
 import io.glutenproject.substrait.type.TypeBuilder;
-import io.glutenproject.substrait.type.TypeNode;
 import io.substrait.proto.Expression;
 
 import org.apache.spark.sql.types.Decimal;
