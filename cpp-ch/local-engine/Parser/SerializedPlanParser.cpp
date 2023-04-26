@@ -1,37 +1,59 @@
 #include "SerializedPlanParser.h"
+
 #include <memory>
-#include <Common/logger_useful.h>
 #include <string_view>
 #include <base/Decimal.h>
+#include <base/types.h>
 #include <AggregateFunctions/AggregateFunctionFactory.h>
 #include <AggregateFunctions/registerAggregateFunctions.h>
 #include <Builder/BroadCastJoinBuilder.h>
 #include <Columns/ColumnSet.h>
+#include <Common/CHUtil.h>
+#include <Common/DebugUtils.h>
+#include <Common/Exception.h>
+#include <Common/JoinHelper.h>
+#include <Common/logger_useful.h>
+#include <Common/MergeTreeTool.h>
+#include <Common/StringUtils.h>
+#include <Common/typeid_cast.h>
 #include <Core/Block.h>
-#include <Core/Names.h>
+#include <Core/ColumnWithTypeAndName.h>
 #include <Core/NamesAndTypes.h>
+#include <Core/Names.h>
+#include <Core/Types.h>
+#include <DataTypes/DataTypeFactory.h>
+#include <DataTypes/IDataType.h>
 #include <DataTypes/DataTypeAggregateFunction.h>
+#include <DataTypes/DataTypeArray.h>
 #include <DataTypes/DataTypeDate32.h>
 #include <DataTypes/DataTypeDateTime64.h>
-#include <DataTypes/DataTypeSet.h>
-#include <DataTypes/DataTypeString.h>
 #include <DataTypes/DataTypeFixedString.h>
-#include <DataTypes/DataTypesDecimal.h>
-#include <DataTypes/DataTypesNumber.h>
-#include <DataTypes/DataTypeDateTime64.h>
-#include <DataTypes/DataTypeArray.h>
 #include <DataTypes/DataTypeMap.h>
-#include <DataTypes/DataTypeTuple.h>
 #include <DataTypes/DataTypeNothing.h>
+#include <DataTypes/DataTypeNullable.h>
+#include <DataTypes/DataTypesDecimal.h>
+#include <DataTypes/DataTypeSet.h>
+#include <DataTypes/DataTypesNumber.h>
+#include <DataTypes/DataTypeString.h>
+#include <DataTypes/DataTypeTuple.h>
+#include <DataTypes/Serializations/ISerialization.h>
+#include <DataTypes/getLeastSupertype.h>
 #include <Functions/FunctionFactory.h>
+#include <Functions/CastOverloadResolver.h>
+#include <Functions/FunctionsConversion.h>
 #include <Functions/registerFunctions.h>
+#include <google/protobuf/util/json_util.h>
+#include <google/protobuf/wrappers.pb.h>
 #include <Interpreters/ActionsDAG.h>
 #include <Interpreters/ActionsVisitor.h>
 #include <Interpreters/CollectJoinOnKeysVisitor.h>
 #include <Interpreters/Context.h>
 #include <Interpreters/HashJoin.h>
 #include <Operator/PartitionColumnFillingTransform.h>
+#include <Parser/RelParser.h>
 #include <Parsers/ASTIdentifier.h>
+#include <Poco/StringTokenizer.h>
+#include <Poco/Util/MapConfiguration.h>
 #include <Processors/Executors/PullingAsyncPipelineExecutor.h>
 #include <Processors/Formats/Impl/ArrowBlockOutputFormat.h>
 #include <Processors/Formats/Impl/ParquetBlockInputFormat.h>
@@ -42,43 +64,17 @@
 #include <Processors/QueryPlan/LimitStep.h>
 #include <Processors/QueryPlan/MergingAggregatedStep.h>
 #include <Processors/QueryPlan/Optimizations/QueryPlanOptimizationSettings.h>
+#include <Processors/QueryPlan/QueryPlan.h>
 #include <Processors/QueryPlan/ReadFromPreparedSource.h>
+#include <Processors/QueryPlan/SortingStep.h>
 #include <Processors/Transforms/AggregatingTransform.h>
 #include <QueryPipeline/Pipe.h>
+#include <QueryPipeline/QueryPipelineBuilder.h>
 #include <Storages/CustomStorageMergeTree.h>
+#include <Storages/IStorage.h>
 #include <Storages/MergeTree/MergeTreeData.h>
 #include <Storages/StorageMergeTreeFactory.h>
 #include <Storages/SubstraitSource/SubstraitFileSource.h>
-#include <Common/logger_useful.h>
-#include <google/protobuf/util/json_util.h>
-#include <google/protobuf/wrappers.pb.h>
-#include <Poco/StringTokenizer.h>
-#include <Poco/Util/MapConfiguration.h>
-#include "Common/Exception.h"
-#include <Common/typeid_cast.h>
-#include <Common/DebugUtils.h>
-#include <Common/JoinHelper.h>
-#include <Common/MergeTreeTool.h>
-#include <Common/StringUtils.h>
-#include <QueryPipeline/QueryPipelineBuilder.h>
-
-#include <Processors/QueryPlan/QueryPlan.h>
-#include <Processors/QueryPlan/SortingStep.h>
-#include <DataTypes/DataTypeFactory.h>
-#include <DataTypes/Serializations/ISerialization.h>
-#include <base/types.h>
-#include <Storages/IStorage.h>
-#include <sys/select.h>
-#include <Common/CHUtil.h>
-#include <Core/Types.h>
-#include <Core/ColumnWithTypeAndName.h>
-#include <Functions/FunctionsConversion.h>
-#include <DataTypes/DataTypeNullable.h>
-#include "DataTypes/IDataType.h"
-#include "Parsers/ExpressionListParsers.h"
-#include "SerializedPlanParser.h"
-#include <Parser/RelParser.h>
-#include <Functions/CastOverloadResolver.h>
 
 namespace DB
 {
@@ -1976,24 +1972,18 @@ std::pair<DataTypePtr, Field> SerializedPlanParser::parseLiteral(const substrait
                 break;
             }
 
-            DataTypePtr first_type;
-            std::tie(first_type, std::ignore) = parseLiteral(values[0]);
-
+            DataTypePtr common_type;
+            std::tie(common_type, std::ignore) = parseLiteral(values[0]);
             size_t list_len = values.size();
             Array array(list_len);
             for (size_t i = 0; i < list_len; ++i)
             {
-                auto type_and_field = std::move(parseLiteral(values[i]));
-                if (!first_type->equals(*type_and_field.first))
-                    throw Exception(
-                        ErrorCodes::LOGICAL_ERROR,
-                        "Literal list type mismatch:{} and {}",
-                        first_type->getName(),
-                        type_and_field.first->getName());
+                auto type_and_field = parseLiteral(values[i]);
+                common_type = getLeastSupertype(DataTypes{common_type, type_and_field.first});
                 array[i] = std::move(type_and_field.second);
             }
 
-            type = std::make_shared<DataTypeArray>(first_type);
+            type = std::make_shared<DataTypeArray>(common_type);
             field = std::move(array);
             break;
         }
@@ -2008,40 +1998,37 @@ std::pair<DataTypePtr, Field> SerializedPlanParser::parseLiteral(const substrait
 
             const auto & first_key_value = key_values[0];
 
-            DataTypePtr first_key_type;
-            std::tie(first_key_type, std::ignore) = parseLiteral(first_key_value.key());
+            DataTypePtr common_key_type;
+            std::tie(common_key_type, std::ignore) = parseLiteral(first_key_value.key());
 
-            DataTypePtr first_value_type;
-            std::tie(first_value_type, std::ignore) = parseLiteral(first_key_value.value());
+            DataTypePtr common_value_type;
+            std::tie(common_value_type, std::ignore) = parseLiteral(first_key_value.value());
 
             Map map;
             map.reserve(key_values.size());
-            for (int i=0; i<key_values.size(); ++i)
+            for (int i = 0; i < key_values.size(); ++i)
             {
                 Tuple tuple(2);
 
                 DataTypePtr key_type;
                 std::tie(key_type, tuple[0]) = parseLiteral(key_values[i].key());
-                if (!first_key_type->equals(*key_type))
+                /// Each key should has the same type
+                if (!common_key_type->equals(*key_type))
                     throw Exception(
                         ErrorCodes::LOGICAL_ERROR,
                         "Literal map key type mismatch:{} and {}",
-                        first_key_type->getName(),
+                        common_key_type->getName(),
                         key_type->getName());
 
                 DataTypePtr value_type;
                 std::tie(value_type, tuple[1]) = parseLiteral(key_values[i].value());
-                if (!first_value_type->equals(*value_type))
-                    throw Exception(
-                        ErrorCodes::LOGICAL_ERROR,
-                        "Literal map value type mismatch:{} and {}",
-                        first_value_type->getName(),
-                        value_type->getName());
+                /// Each value should has least super type for all of them
+                common_value_type = getLeastSupertype(DataTypes{common_value_type, value_type});
 
                 map.emplace_back(std::move(tuple));
             }
 
-            type = std::make_shared<DataTypeMap>(first_key_type, first_value_type);
+            type = std::make_shared<DataTypeMap>(common_key_type, common_key_type);
             field = std::move(map);
             break;
         }
