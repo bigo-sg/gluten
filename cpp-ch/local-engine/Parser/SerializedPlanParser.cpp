@@ -2028,7 +2028,7 @@ std::pair<DataTypePtr, Field> SerializedPlanParser::parseLiteral(const substrait
                 map.emplace_back(std::move(tuple));
             }
 
-            type = std::make_shared<DataTypeMap>(common_key_type, common_key_type);
+            type = std::make_shared<DataTypeMap>(common_key_type, common_value_type);
             field = std::move(map);
             break;
         }
