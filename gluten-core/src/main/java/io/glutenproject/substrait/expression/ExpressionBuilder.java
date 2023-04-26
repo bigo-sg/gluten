@@ -127,10 +127,6 @@ public class ExpressionBuilder {
     return new StringLiteralNode(vString, typeNode);
   }
 
-  public static BinaryStructNode makeBinaryStruct(byte[][] binary, StructType type) {
-    return new BinaryStructNode(binary, type);
-  }
-
   public static BinaryLiteralNode makeBinaryLiteral(byte[] vBytes) {
     return new BinaryLiteralNode(vBytes);
   }

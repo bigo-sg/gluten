@@ -31,6 +31,12 @@ public class StructLiteralNode extends LiteralNodeWithValue<GenericInternalRow> 
     super(row, typeNode);
   }
 
+  public LiteralNode getFieldLiteral(int index) {
+    Object[] values = getValue().values();
+    ArrayList<TypeNode> fieldTypes = ((StructNode) getTypeNode()).getFieldTypes();
+    return ExpressionBuilder.makeLiteral(values[index], fieldTypes.get(index));
+  }
+
   @Override
   protected void updateLiteralBuilder(Builder literalBuilder, GenericInternalRow row) {
     ArrayList<TypeNode> fieldTypes = ((StructNode) getTypeNode()).getFieldTypes();
