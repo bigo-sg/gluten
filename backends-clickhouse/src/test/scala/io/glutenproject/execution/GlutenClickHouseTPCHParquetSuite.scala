@@ -449,7 +449,9 @@ class GlutenClickHouseTPCHParquetSuite extends GlutenClickHouseTPCHAbstractSuite
         MAP("a", 1, "b", 2) AS map_literal,
         STRUCT("hello", 123) AS struct_literal,
         ARRAY() as empty_array_literal,
-        MAP() as empty_map_literal
+        MAP() as empty_map_literal,
+        ARRAY(1, NULL, 3) as array_with_null_literal,
+        MAP(1, 2, CAST(3 as SHORT), null) as map_with_null_literal
       from range(10)"""
     runQueryAndCompare(query)(checkOperatorMatch[ProjectExecTransformer])
   }
