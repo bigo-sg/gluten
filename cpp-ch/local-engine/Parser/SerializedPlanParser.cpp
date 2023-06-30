@@ -260,6 +260,7 @@ QueryPlanStepPtr SerializedPlanParser::parseReadRealWithJavaIter(const substrait
     assert(rel.has_local_files());
     assert(rel.local_files().items().size() == 1);
     assert(rel.has_base_schema());
+
     auto iter = rel.local_files().items().at(0).uri_file();
     auto pos = iter.find(':');
     auto iter_index = std::stoi(iter.substr(pos + 1, iter.size()));
@@ -416,9 +417,7 @@ Block SerializedPlanParser::parseNameStruct(const substrait::NamedStruct & struc
     internal_cols.reserve(struct_.names_size());
     std::list<std::string> field_names;
     for (int i = 0; i < struct_.names_size(); ++i)
-    {
         field_names.emplace_back(struct_.names(i));
-    }
 
     for (int i = 0; i < struct_.struct_().types_size(); ++i)
     {
@@ -433,11 +432,10 @@ Block SerializedPlanParser::parseNameStruct(const substrait::NamedStruct & struc
             auto nested_data_type = DB::removeNullable(data_type);
             const auto * tuple_type = typeid_cast<const DataTypeTuple *>(nested_data_type.get());
             if (!tuple_type)
-            {
                 throw DB::Exception(DB::ErrorCodes::UNKNOWN_TYPE, "Tuple is expected, but got {}", data_type->getName());
-            }
+
             auto args_types = tuple_type->getElements();
-            auto agg_function_name = getFunctionName(name_parts[3], {});
+            auto agg_function_name = getFunctionName(name_parts[3], substrait::AggregateFunction{});
             AggregateFunctionProperties properties;
             auto tmp = AggregateFunctionFactory::instance().get(agg_function_name, args_types, {}, properties);
             data_type = tmp->getStateType();
@@ -888,11 +886,11 @@ NamesAndTypesList SerializedPlanParser::blockToNameAndTypeList(const Block & hea
     return types;
 }
 
-std::string
-SerializedPlanParser::getFunctionName(const std::string & function_signature, const substrait::Expression_ScalarFunction & function)
+template <SubstraitFunction F>
+std::string SerializedPlanParser::getFunctionName(const std::string & function_signature, const F & function)
 {
     const auto & output_type = function.output_type();
-    auto args = function.arguments();
+    const auto & args = function.arguments();
     auto pos = function_signature.find(':');
     auto function_name = function_signature.substr(0, pos);
     if (!SCALAR_FUNCTIONS.contains(function_name))
@@ -1024,18 +1022,35 @@ SerializedPlanParser::getFunctionName(const std::string & function_signature, co
         if (function_signature.find("vbin") != std::string::npos)
             ch_function_name = "length";
     }
+    else if (function_name == "approx_percentile")
+    {
+        /// Spark approx_percentile(col, array(0.5, 0.4, 0.1), 100) => CH quantilesGK(100, 0.5. 0.4, 0.1)(col)
+        /// Spark approx_percentile(col, 0.5, 100) => CH quantileGK(100, 0.5)(col)
+        if (function_signature.find("_list_") != std::string::npos)
+            ch_function_name = "quantilesGK";
+        else
+            ch_function_name = "quantileGK";
+        std::cout << "sig:" << function_signature << std::endl;
+        std::cout << "chfunc:" << ch_function_name << std::endl;
+    }
     else
         ch_function_name = SCALAR_FUNCTIONS.at(function_name);
 
     return ch_function_name;
 }
 
+template std::string
+SerializedPlanParser::getFunctionName(const std::string & function_signature, const substrait::Expression_ScalarFunction & function);
+
+template std::string
+SerializedPlanParser::getFunctionName(const std::string & function_signature, const substrait::Expression_WindowFunction & function);
+
+template std::string
+SerializedPlanParser::getFunctionName(const std::string & function_signature, const substrait::AggregateFunction & function);
+
+
 ActionsDAG::NodeRawConstPtrs SerializedPlanParser::parseArrayJoinWithDAG(
-    const substrait::Expression & rel,
-    std::vector<String> & result_names,
-    DB::ActionsDAGPtr actions_dag,
-    bool keep_result,
-    bool position)
+    const substrait::Expression & rel, std::vector<String> & result_names, DB::ActionsDAGPtr actions_dag, bool keep_result, bool position)
 {
     if (!rel.has_scalar_function())
         throw Exception(ErrorCodes::BAD_ARGUMENTS, "The root of expression should be a scalar function:\n {}", rel.DebugString());

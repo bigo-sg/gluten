@@ -1,7 +1,7 @@
 #include "AggregateRelParser.h"
+
 #include <memory>
 #include <AggregateFunctions/AggregateFunctionIf.h>
-#include <Common/StringUtils/StringUtils.h>
 #include <DataTypes/DataTypeAggregateFunction.h>
 #include <DataTypes/DataTypeNullable.h>
 #include <DataTypes/DataTypeTuple.h>
@@ -10,6 +10,7 @@
 #include <Processors/QueryPlan/AggregatingStep.h>
 #include <Processors/QueryPlan/ExpressionStep.h>
 #include <Processors/QueryPlan/MergingAggregatedStep.h>
+#include <Common/StringUtils/StringUtils.h>
 
 namespace DB
 {
@@ -64,23 +65,63 @@ void AggregateRelParser::setup(DB::QueryPlanPtr query_plan, const substrait::Rel
     has_final_stage = phase_set.contains(substrait::AggregationPhase::AGGREGATION_PHASE_INTERMEDIATE_TO_RESULT);
 
     if (phase_set.size() > 1 && has_final_stage)
-    {
         throw DB::Exception(DB::ErrorCodes::LOGICAL_ERROR, "AggregateRelParser: multiple aggregation phases with final stage are not supported");
-    }
 
     auto input_header = plan->getCurrentDataStream().header;
     for (const auto & measure : aggregate_rel->measures())
     {
-        AggregateInfo agg_info;
-        auto arg = measure.measure().arguments(0).value();
-        auto function_name = parseFunctionName(measure.measure().function_reference(), {});
+        const auto & agg_func = measure.measure();
+        auto function_name = parseFunctionName(agg_func.function_reference(), agg_func);
         if (!function_name)
-        {
             throw Exception(DB::ErrorCodes::BAD_ARGUMENTS, "Unsupported aggregate function");
-        }
-        agg_info.measure = &measure;
+
+        AggregateInfo agg_info;
         agg_info.function_name = *function_name;
-        aggregates.push_back(agg_info);
+        agg_info.measure.reset(measure.New());
+
+        if (agg_info.function_name == "quantileGK" || agg_info.function_name == "quantilesGK")
+        {
+            /// Special setup for approx_percentile because:
+            /// Spark approx_percentile(col, array(0.5, 0.4, 0.1), 100) => CH quantilesGK(100, 0.5. 0.4, 0.1)(col)
+            /// Spark approx_percentile(col, 0.5, 100) => CH quantileGK(100, 0.5)(col)
+            const auto & args = agg_func.arguments();
+            const auto & col_arg = args[0].value();
+            const auto & percentile_arg = args[1].value();
+            const auto & accurary_arg = args[2].value();
+            if (!accurary_arg.has_literal() || !percentile_arg.has_literal())
+                throw Exception(
+                    ErrorCodes::BAD_ARGUMENTS,
+                    "Spark function approx_percentile requires the second and third argument to be literal, but got {} and {}",
+                    percentile_arg.ShortDebugString(),
+                    accurary_arg.ShortDebugString());
+
+            auto accuracy = parseLiteral(accurary_arg.literal());
+            auto percentile = parseLiteral(percentile_arg.literal());
+            std::cout << "function_name:" << agg_info.function_name << ", accuracy:" << toString(accuracy.second)
+                      << ", percentile:" << toString(percentile.second) << std::endl;
+
+            Array & params = agg_info.parameters;
+            params.emplace_back(std::move(accuracy.second));
+            if (function_name == "quantileGK")
+                params.emplace_back(std::move(percentile.second));
+            else
+            {
+                Array & percentile_array = percentile.second.safeGet<Array>();
+                for (const auto & percentile_field : percentile_array)
+                {
+                    params.emplace_back(std::move(percentile_field));
+                }
+            }
+            std::cout << "original params:" << toString(params) << std::endl;
+
+            /// Remove the second and third column from the substrait arguments.
+            agg_info.measure->CopyFrom(measure);
+            agg_info.measure->mutable_measure()->mutable_arguments()->DeleteSubrange(1, 2);
+        }
+        else
+            agg_info.measure->CopyFrom(measure);
+
+        aggregates.emplace_back(std::move(agg_info));
     }
 
     if (aggregate_rel->groupings_size() == 1)
@@ -88,19 +129,13 @@ void AggregateRelParser::setup(DB::QueryPlanPtr query_plan, const substrait::Rel
         for (const auto & expr : aggregate_rel->groupings(0).grouping_expressions())
         {
             if (expr.has_selection() && expr.selection().has_direct_reference())
-            {
                 grouping_keys.push_back(input_header.getByPosition(expr.selection().direct_reference().struct_field().field()).name);
-            }
             else
-            {
                 throw Exception(ErrorCodes::BAD_ARGUMENTS, "unsupported group expression: {}", expr.DebugString());
-            }
         }
     }
     else if (aggregate_rel->groupings_size() != 0)
-    {
         throw DB::Exception(ErrorCodes::BAD_ARGUMENTS, "Unsupport multible groupings");
-    }
 }
 
 // projections for function arguments.
@@ -134,9 +169,7 @@ void AggregateRelParser::addPreProjection()
                 need_projection = true;
             }
             else
-            {
                 throw Exception(DB::ErrorCodes::UNKNOWN_TYPE, "Unsupported aggregate argument: {}", arg_value.DebugString());
-            }
 
             // If the aggregate result is required to be nullable, make all inputs be nullable at the first stage.
             auto required_output_which_type = WhichDataType(parseType(agg_info.measure->measure().output_type()));
@@ -153,6 +186,7 @@ void AggregateRelParser::addPreProjection()
                 arg_column_type = node->result_type;
                 need_projection = true;
             }
+
             agg_info.arg_column_names.emplace_back(arg_column_name);
             agg_info.arg_column_types.emplace_back(arg_column_type);
         }
@@ -167,6 +201,7 @@ void AggregateRelParser::addPreProjection()
             need_projection = true;
         }
     }
+
     if (need_projection)
     {
         auto projection_step = std::make_unique<DB::ExpressionStep>(plan->getCurrentDataStream(), projection_action);
@@ -188,6 +223,7 @@ void AggregateRelParser::buildAggregateDescriptions(AggregateDescriptions & desc
         String arg_list_str = boost::algorithm::join(arg_column_names, ",");
         return function_name + "(" + arg_list_str + ")";
     };
+
     for (auto & agg_info : aggregates)
     {
         AggregateDescription description;
@@ -201,14 +237,11 @@ void AggregateRelParser::buildAggregateDescriptions(AggregateDescriptions & desc
         if (measure.phase() != substrait::AggregationPhase::AGGREGATION_PHASE_INITIAL_TO_INTERMEDIATE)
         {
             if (agg_info.arg_column_types.size() != 1)
-            {
                 throw Exception(DB::ErrorCodes::BAD_ARGUMENTS, "Only support one argument aggregate function in phase {}", measure.phase());
-            }
+
             // Add a check here for safty.
             if (!agg_info.filter_column_name.empty())
-            {
                 throw DB::Exception(DB::ErrorCodes::LOGICAL_ERROR, "Unspport apply filter in phase {}", measure.phase());
-            }
 
             const auto * agg_function_data = DB::checkAndGetDataType<DB::DataTypeAggregateFunction>(agg_info.arg_column_types[0].get());
             if (!agg_function_data)
@@ -223,7 +256,7 @@ void AggregateRelParser::buildAggregateDescriptions(AggregateDescriptions & desc
                     {
                         arg_column_types = tupe_type->getElements();
                     }
-                    auto agg_function = getAggregateFunction(function_name, arg_column_types);
+                    auto agg_function = getAggregateFunction(function_name, arg_column_types, agg_info.parameters);
                     auto agg_intermediate_result_type = agg_function->getStateType();
                     arg_column_types = {agg_intermediate_result_type};
                 }
@@ -234,8 +267,8 @@ void AggregateRelParser::buildAggregateDescriptions(AggregateDescriptions & desc
                 // It's safe to use AggregateFunctionxxx to parse intermediate result from AggregateFunctionxxxIf,
                 // since they have the same binary representation
                 // reproduce this case by
-                //  select 
-                //    count(a),count(b), count(1), count(distinct(a)), count(distinct(b)) 
+                //  select
+                //    count(a),count(b), count(1), count(distinct(a)), count(distinct(b))
                 //  from values (1, null), (2,2) as data(a,b)
                 // with `first_value` enable
                 if (measure.phase() != substrait::AggregationPhase::AGGREGATION_PHASE_INITIAL_TO_INTERMEDIATE)
@@ -245,11 +278,12 @@ void AggregateRelParser::buildAggregateDescriptions(AggregateDescriptions & desc
                     {
                         auto original_args_types = agg_function_data->getArgumentsDataTypes();
                         arg_column_types = DataTypes(original_args_types.begin(), std::prev(original_args_types.end()));
-                        auto agg_function = getAggregateFunction(function_name, arg_column_types);
+                        auto agg_function = getAggregateFunction(function_name, arg_column_types, agg_info.parameters);
                         arg_column_types = {agg_function->getStateType()};
                     }
                 }
             }
+
             function_name = function_name + partial_merge_suffix;
         }
         else if (!agg_info.filter_column_name.empty())
@@ -257,7 +291,8 @@ void AggregateRelParser::buildAggregateDescriptions(AggregateDescriptions & desc
             // Apply `If` aggregate function combinator on the original aggregate function.
             function_name += "If";
         }
-        description.function = getAggregateFunction(function_name, arg_column_types);
+
+        description.function = getAggregateFunction(function_name, arg_column_types, agg_info.parameters);
         descriptions.emplace_back(description);
     }
 }
@@ -331,7 +366,7 @@ void AggregateRelParser::addAggregatingStep()
 // Only be called in final stage.
 void AggregateRelParser::addPostProjection()
 {
-    addPostProjectionForAggregatingResult();   
+    addPostProjectionForAggregatingResult();
     addPostProjectionForTypeMismatch();
 }
 

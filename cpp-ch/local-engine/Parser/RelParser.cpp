@@ -1,4 +1,5 @@
 #include "RelParser.h"
+
 #include <string>
 #include <AggregateFunctions/AggregateFunctionFactory.h>
 #include <DataTypes/IDataType.h>
@@ -27,22 +28,11 @@ std::optional<String> RelParser::parseSignatureFunctionName(UInt32 function_ref)
     const auto & function_mapping = getFunctionMapping();
     auto it = function_mapping.find(std::to_string(function_ref));
     if (it == function_mapping.end())
-    {
         return {};
-    }
+
     auto function_signature = it->second;
     auto function_name = function_signature.substr(0, function_signature.find(':'));
     return function_name;
-}
-
-std::optional<String> RelParser::parseFunctionName(UInt32 function_ref, const substrait::Expression_ScalarFunction & function)
-{
-    auto sigature_name = parseSignatureFunctionName(function_ref);
-    if (!sigature_name)
-    {
-        return {};
-    }
-    return plan_parser->getFunctionName(*sigature_name, function);
 }
 
 RelParserFactory & RelParserFactory::instance()
@@ -55,9 +45,8 @@ void RelParserFactory::registerBuilder(UInt32 k, RelParserBuilder builder)
 {
     auto it = builders.find(k);
     if (it != builders.end())
-    {
         throw Exception(DB::ErrorCodes::BAD_ARGUMENTS, "Duplicated builder key:{}", k);
-    }
+
     builders[k] = builder;
 }
 
