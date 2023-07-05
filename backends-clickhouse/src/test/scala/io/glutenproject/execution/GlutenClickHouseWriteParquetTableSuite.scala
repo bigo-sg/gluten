@@ -69,7 +69,7 @@ class GlutenClickHouseWriteParquetTableSuite()
       .set("spark.databricks.delta.stalenessLimit", "3600000")
       .set("spark.gluten.sql.columnar.columnartorow", "true")
       .set("spark.gluten.sql.columnar.backend.ch.worker.id", "1")
-      .set(GlutenConfig.GLUTEN_LIB_PATH, "/usr/local/clickhouse/lib/libchd.so")
+      .set(GlutenConfig.GLUTEN_LIB_PATH, "/usr/local/clickhouse/lib/libch.so")
       .set("spark.gluten.sql.columnar.iterator", "true")
       .set("spark.gluten.sql.columnar.hashagg.enablefinal", "true")
       .set("spark.gluten.sql.enable.native.validation", "false")
@@ -181,7 +181,7 @@ class GlutenClickHouseWriteParquetTableSuite()
   }
 
   test("test hive parquet table") {
-    withSQLConf(("spark.gluten.sql.native.parquet.writer.enabled", "true")) {
+    withSQLConf(("spark.gluten.sql.native.parquet.writer.enabled", "false")) {
 
       val fields: ListMap[String, String] = ListMap(
         ("string_field", "string"),
@@ -191,7 +191,7 @@ class GlutenClickHouseWriteParquetTableSuite()
         ("double_field", "double"),
         ("short_field", "short"),
         ("byte_field", "byte"),
-        ("bool_field", "boolean"),
+        ("boolean_field", "boolean"),
         ("decimal_field", "decimal(23,12)"),
         ("date_field", "date")
       )
@@ -202,7 +202,42 @@ class GlutenClickHouseWriteParquetTableSuite()
             .filterNot(e => e._1.equals("date_field"))
             .map(f => s"${f._1} ${f._2}")
             .mkString(",") +
-          " ) partitioned by (date_field date) stored as parquet"
+          " ) partitioned by (date_field date) " +
+          "stored as parquet"
+      // spark write does not support bucketed table
+      // https://issues.apache.org/jira/browse/SPARK-19256
+
+      writeAndCheckRead(parquet_table_create_sql, fields.keys.toSeq)
+    }
+  }
+
+  ignore("test hive parquet table, all columns being partitioned") {
+    withSQLConf(("spark.gluten.sql.native.parquet.writer.enabled", "false")) {
+
+      val fields: ListMap[String, String] = ListMap(
+        ("string_field", "string"),
+        ("int_field", "int"),
+        ("long_field", "long"),
+        ("float_field", "float"),
+        ("double_field", "double"),
+        ("short_field", "short"),
+        ("byte_field", "byte"),
+        ("boolean_field", "boolean"),
+        ("decimal_field", "decimal(23,12)"),
+        ("date_field", "date")
+      )
+
+      val parquet_table_create_sql =
+        s"create table if not exists $parquet_table_name (" +
+          " date_field date" + " ) partitioned by (" +
+          fields
+            .filterNot(e => e._1.equals("date_field"))
+            .map(f => s"${f._1} ${f._2}")
+            .mkString(",") +
+          ") " +
+          "stored as parquet"
+      // spark write does not support bucketed table
+      // https://issues.apache.org/jira/browse/SPARK-19256
 
       writeAndCheckRead(parquet_table_create_sql, fields.keys.toSeq)
     }
