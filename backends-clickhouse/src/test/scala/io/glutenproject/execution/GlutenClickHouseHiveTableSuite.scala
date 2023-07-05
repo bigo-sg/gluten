@@ -98,7 +98,7 @@ class GlutenClickHouseHiveTableSuite()
 
   override protected def spark: SparkSession = {
     val hiveMetaStoreDB = metaStorePathAbsolute + "/metastore_db"
-    SparkSession
+    val sparkSession = SparkSession
       .builder()
       .config(sparkConf)
       .enableHiveSupport()
@@ -106,6 +106,8 @@ class GlutenClickHouseHiveTableSuite()
         "javax.jdo.option.ConnectionURL",
         s"jdbc:derby:;databaseName=$hiveMetaStoreDB;create=true")
       .getOrCreate()
+    sparkSession.sparkContext.setLogLevel("DEBUG")
+    sparkSession
   }
 
   private val txt_table_name = "hive_txt_test"
@@ -194,6 +196,7 @@ class GlutenClickHouseHiveTableSuite()
     initializeTable(json_table_name, json_table_create_sql)
   }
 
+  /*
   test("test hive text table") {
     val sql =
       s"""
@@ -310,7 +313,78 @@ class GlutenClickHouseHiveTableSuite()
         assert(txtFileScan.size == 1)
       })
   }
+   */
 
+  test("test hive parquet table with complex types") {
+    withSQLConf(("spark.gluten.sql.native.parquet.writer.enabled", "true")) {
+      spark.sql(
+        "create table if not exists test_text1 (string_field string,int_field int,long_field long,float_field float,double_field double,short_field short,byte_field byte, bool_field boolean, decimal_field decimal(23, 12), date_field date, array_field array<int>, array_field_with_null array<int>, map_field map<int, long>, map_field_with_null map<int, long>) stored as textfile;")
+      spark.sql(
+        "insert into test_text1 select cast(id as String), cast(id as int), cast(id as long), cast(id as float), cast(id as double), cast(id as short), cast(id as byte), id % 2 = 0, cast((id + 0.56) as decimal(23, 12)), date(now()), array(id+1, id+2, id+3), array(id+1, null, id+3), map(id+1, id+2, id+3, id+4), map() from range(200);")
+      spark.sql(
+        "create table if not exists hive_parquet_test1 (string_field string,int_field int,long_field long,float_field float,double_field double,short_field short,byte_field byte,bool_field boolean,decimal_field decimal(23, 12),array_field array<int>,array_field_with_null array<int>,map_field map<int, long>,map_field_with_null map<int, long> ) partitioned by (date_field date) stored as parquet;")
+      spark.sql(
+        "insert overwrite hive_parquet_test1 select string_field,int_field,long_field,float_field, double_field,short_field,byte_field,bool_field,decimal_field, array_field, array_field_with_null , map_field, map_field_with_null , date_field from test_text1")
+    }
+
+    withSQLConf(("spark.gluten.enabled", "true")) {
+      val sql2 = s"select * from hive_parquet_test1"
+      spark.sql(sql2).show(100)
+      println("")
+    }
+  }
+
+  /*
+  test("test hive parquet table") {
+    withSQLConf(("spark.gluten.sql.native.parquet.writer.enabled", "true")) {
+
+      val table_name = parquet_table_name
+      val table_create_sql = parquet_table_create_sql // this is a partitioned table
+      spark.createDataFrame(genTestData()).createOrReplaceTempView("tmp_t")
+      spark.sql(s"drop table IF EXISTS $table_name")
+      spark.sql(table_create_sql)
+      //    spark.sql(
+      //      ("insert overwrite local directory '/tmp/destination' stored as parquet select string_field,int_field,long_field,float_field," +
+      //        "double_field,short_field,byte_field,bool_field,decimal_field" +
+      //        " from tmp_t").format(table_name))
+
+      // test selected column order different from table schema
+
+      // test composite bucket expression
+
+      // test multiple partition col
+      spark.sql(
+        ("insert overwrite %s   select string_field,int_field,long_field,float_field," +
+          "double_field,short_field,byte_field,bool_field,decimal_field,date_field" +
+          " from tmp_t").format(table_name))
+
+//      val sql =
+//        s"""
+//           | select string_field,
+//           |        sum(int_field),
+//           |        avg(long_field),
+//           |        min(float_field),
+//           |        max(double_field),
+//           |        sum(short_field),
+//           |        sum(decimal_field)
+//           | from $parquet_table_name
+//           | group by string_field
+//           | order by string_field
+//           |""".stripMargin
+//      val sql2 = s"select count(*), string_field from $parquet_table_name group by string_field"
+//      spark.sql(sql2).show(100)
+//      compareResultsAgainstVanillaSpark(sql, true, f => {})
+    }
+    withSQLConf(("spark.gluten.enabled", "false")) {
+      val sql2 = s"select count(*), string_field from $parquet_table_name group by string_field"
+      spark.sql(sql2).show(100)
+      println("")
+    }
+
+  }
+   */
+
+  /*
   test("test hive json table") {
     val sql =
       s"""
@@ -427,4 +501,53 @@ class GlutenClickHouseHiveTableSuite()
       })
   }
 
+  test("text hive table with space/tab delimiter") {
+    val txt_table_name_space_delimiter = "hive_txt_table_space_delimiter"
+    val txt_table_name_tab_delimiter = "hive_txt_table_tab_delimiter"
+    val drop_space_table_sql = "drop table if exists %s".format(txt_table_name_space_delimiter)
+    val drop_tab_table_sql = "drop table if exists %s".format(txt_table_name_tab_delimiter)
+    val create_space_table_sql =
+      "create table if not exists %s (".format(txt_table_name_space_delimiter) +
+        "int_field int," +
+        "string_field string" +
+        ") row format delimited fields terminated by ' ' stored as textfile"
+    val create_tab_table_sql =
+      "create table if not exists %s (".format(txt_table_name_tab_delimiter) +
+        "int_field int," +
+        "string_field string" +
+        ") row format delimited fields terminated by '\t' stored as textfile"
+    spark.sql(drop_space_table_sql)
+    spark.sql(drop_tab_table_sql)
+    spark.sql(create_space_table_sql)
+    spark.sql(create_tab_table_sql)
+    spark.sql("insert into %s values(1, 'ab')".format(txt_table_name_space_delimiter))
+    spark.sql("insert into %s values(1, 'ab')".format(txt_table_name_tab_delimiter))
+    val sql1 =
+      s"""
+         | select * from $txt_table_name_space_delimiter where int_field > 0
+         |""".stripMargin
+    val sql2 =
+      s"""
+         | select * from $txt_table_name_tab_delimiter where int_field > 0
+         |""".stripMargin
+
+    compareResultsAgainstVanillaSpark(
+      sql1,
+      true,
+      df => {
+        val txtFileScan = collect(df.queryExecution.executedPlan) {
+          case l: HiveTableScanExecTransformer => l
+        }
+        assert(txtFileScan.size == 1)
+      })
+    compareResultsAgainstVanillaSpark(
+      sql2,
+      true,
+      df => {
+        val txtFileScan = collect(df.queryExecution.executedPlan) {
+          case l: HiveTableScanExecTransformer => l
+        }
+        assert(txtFileScan.size == 1)
+      })
+  }
 }
