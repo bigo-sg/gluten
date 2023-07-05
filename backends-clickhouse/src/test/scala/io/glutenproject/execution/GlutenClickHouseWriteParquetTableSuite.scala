@@ -17,15 +17,11 @@
 package io.glutenproject.execution
 
 import io.glutenproject.GlutenConfig
-import io.glutenproject.utils.UTSystemParameters
-
+import org.apache.commons.io.FileUtils
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanHelper
-import org.apache.spark.sql.hive.HiveTableScanExecTransformer
 import org.apache.spark.sql.test.SharedSparkSession
-
-import org.apache.commons.io.FileUtils
 import org.scalatest.BeforeAndAfterAll
 
 import java.io.File
@@ -181,7 +177,7 @@ class GlutenClickHouseWriteParquetTableSuite()
   }
 
   test("test hive parquet table") {
-    withSQLConf(("spark.gluten.sql.native.parquet.writer.enabled", "false")) {
+    withSQLConf(("spark.gluten.sql.native.parquet.writer.enabled", "true")) {
 
       val fields: ListMap[String, String] = ListMap(
         ("string_field", "string"),
@@ -211,10 +207,43 @@ class GlutenClickHouseWriteParquetTableSuite()
     }
   }
 
+  test("test hive parquet table, 2 partition cols") {
+    withSQLConf(
+      ("spark.gluten.sql.native.parquet.writer.enabled", "true"),
+      ("spark.gluten.enabled", "true")) {
+
+      val fields: ListMap[String, String] = ListMap(
+        ("string_field", "string"),
+        ("int_field", "int"),
+        ("long_field", "long"),
+        ("float_field", "float"),
+        ("double_field", "double"),
+        ("short_field", "short"),
+        ("boolean_field", "boolean"),
+        ("decimal_field", "decimal(23,12)"),
+        ("date_field", "date"),
+        ("byte_field", "byte")
+      )
+
+      val parquet_table_create_sql =
+        s"create table if not exists $parquet_table_name (" +
+          fields
+            .filterNot(e => e._1.equals("date_field") || e._1.equals("byte_field"))
+            .map(f => s"${f._1} ${f._2}")
+            .mkString(",") + " ) partitioned by (date_field date, byte_field byte) " +
+          "stored as parquet"
+      // spark write does not support bucketed table
+      // https://issues.apache.org/jira/browse/SPARK-19256
+
+      writeAndCheckRead(parquet_table_create_sql, fields.keys.toSeq)
+    }
+  }
+
   ignore("test hive parquet table, all columns being partitioned") {
     withSQLConf(("spark.gluten.sql.native.parquet.writer.enabled", "false")) {
 
       val fields: ListMap[String, String] = ListMap(
+        ("date_field", "date"),
         ("string_field", "string"),
         ("int_field", "int"),
         ("long_field", "long"),
@@ -224,7 +253,6 @@ class GlutenClickHouseWriteParquetTableSuite()
         ("byte_field", "byte"),
         ("boolean_field", "boolean"),
         ("decimal_field", "decimal(23,12)"),
-        ("date_field", "date")
       )
 
       val parquet_table_create_sql =
@@ -245,7 +273,7 @@ class GlutenClickHouseWriteParquetTableSuite()
 
   test(("test hive parquet table with aggregated results")) {
     withSQLConf(
-      ("spark.gluten.sql.native.parquet.writer.enabled", "false"),
+      ("spark.gluten.sql.native.parquet.writer.enabled", "true"),
       ("spark.gluten.enabled", "true")) {
 
       val fields: ListMap[String, String] = ListMap(
