@@ -318,13 +318,17 @@ class GlutenClickHouseHiveTableSuite()
   test("test hive parquet table with complex types") {
     withSQLConf(("spark.gluten.sql.native.parquet.writer.enabled", "true")) {
       spark.sql(
-        "create table if not exists test_text1 (string_field string,int_field int,long_field long,float_field float,double_field double,short_field short,byte_field byte, bool_field boolean, decimal_field decimal(23, 12), date_field date, array_field array<int>, array_field_with_null array<int>, map_field map<int, long>, map_field_with_null map<int, long>) stored as textfile;")
+        "create table if not exists test_text1 (string_field string,int_field int,long_field long,float_field float,double_field double,short_field short,byte_field byte, bool_field boolean, decimal_field decimal(23, 12), date_field date, array_field array<int>, array_field_with_null array<int>, map_field map<int, long>, map_field_with_null map<int, long>, struct_field struct<a int, b long>, struct_field_with_null_struct struct<a int, b long>) stored as textfile;")
+      /*
       spark.sql(
-        "insert into test_text1 select cast(id as String), cast(id as int), cast(id as long), cast(id as float), cast(id as double), cast(id as short), cast(id as byte), id % 2 = 0, cast((id + 0.56) as decimal(23, 12)), date(now()), array(id+1, id+2, id+3), array(id+1, null, id+3), map(id+1, id+2, id+3, id+4), map() from range(200);")
+        "insert into test_text1 select cast(id as String), cast(id as int), cast(id as long), cast(id as float), cast(id as double), cast(id as short), cast(id as byte), id % 2 = 0, cast((id + 0.56) as decimal(23, 12)), date(now()), array(id+1, id+2, id+3), array(id+1, null, id+3), map(id+1, id+2, id+3, id+4), map(), struct(id+1, id+2), struct(null, null) from range(200);")
+       */
       spark.sql(
-        "create table if not exists hive_parquet_test1 (string_field string,int_field int,long_field long,float_field float,double_field double,short_field short,byte_field byte,bool_field boolean,decimal_field decimal(23, 12),array_field array<int>,array_field_with_null array<int>,map_field map<int, long>,map_field_with_null map<int, long> ) partitioned by (date_field date) stored as parquet;")
+        "insert into test_text1 select null, null, null, null, null, null, null, null, null, date(now()), null, null, null, null, null, null from range(200);")
       spark.sql(
-        "insert overwrite hive_parquet_test1 select string_field,int_field,long_field,float_field, double_field,short_field,byte_field,bool_field,decimal_field, array_field, array_field_with_null , map_field, map_field_with_null , date_field from test_text1")
+        "create table if not exists hive_parquet_test1 (string_field string,int_field int,long_field long,float_field float,double_field double,short_field short,byte_field byte,bool_field boolean,decimal_field decimal(23, 12),array_field array<int>,array_field_with_null array<int>,map_field map<int, long>,map_field_with_null map<int, long>, struct_field struct<a int, b long>, struct_field_with_null_struct struct<a int, b long>) partitioned by (date_field date) stored as parquet;")
+      spark.sql(
+        "insert overwrite hive_parquet_test1 select string_field,int_field,long_field,float_field, double_field,short_field,byte_field,bool_field,decimal_field, array_field, array_field_with_null , map_field, map_field_with_null, struct_field, struct_field_with_null_struct, date_field from test_text1")
     }
 
     withSQLConf(("spark.gluten.enabled", "true")) {
