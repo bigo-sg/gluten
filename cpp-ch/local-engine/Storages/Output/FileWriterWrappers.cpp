@@ -29,12 +29,12 @@ void NormalFileWriter::close()
     writer->finish();
 }
 
-FileWriterWrapper * createFileWriterWrapper(std::string file_uri)
+FileWriterWrapper * createFileWriterWrapper(std::string file_uri, std::vector<std::string> & preferred_column_names)
 {
     Poco::URI poco_uri(file_uri);
     auto context = DB::Context::createCopy(local_engine::SerializedPlanParser::global_context);
     auto write_buffer_builder = WriteBufferBuilderFactory::instance().createBuilder(poco_uri.getScheme(), context);
-    auto file = OutputFormatFileUtil::createFile(context, write_buffer_builder, file_uri);
+    auto file = OutputFormatFileUtil::createFile(context, write_buffer_builder, file_uri, preferred_column_names);
     return new NormalFileWriter(file, context);
 }
 

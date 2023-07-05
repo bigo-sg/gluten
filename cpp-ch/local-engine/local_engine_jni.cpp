@@ -868,11 +868,20 @@ JNIEXPORT void Java_io_glutenproject_vectorized_CHBlockWriterJniWrapper_nativeCl
 }
 
 JNIEXPORT jlong Java_org_apache_spark_sql_execution_datasources_CHDatasourceJniWrapper_nativeInitFileWriterWrapper(
-    JNIEnv * env, jobject obj, jstring file_uri_)
+    JNIEnv * env, jobject obj, jstring file_uri_, jobjectArray names_)
 {
     LOCAL_ENGINE_JNI_METHOD_START
+    int num_columns = env->GetArrayLength(names_);
+    std::vector<std::string> names;
+    names.reserve(num_columns);
+    for (int i = 0; i < num_columns; i++)
+    {
+        auto * name = static_cast<jstring>(env->GetObjectArrayElement(names_, i));
+        names.emplace_back(std::move(jstring2string(env, name)));
+        env->DeleteLocalRef(name);
+    }
     auto file_uri = jstring2string(env, file_uri_);
-    auto * writer = local_engine::createFileWriterWrapper(file_uri);
+    auto * writer = local_engine::createFileWriterWrapper(file_uri, names);
     return reinterpret_cast<jlong>(writer);
     LOCAL_ENGINE_JNI_METHOD_END(env, )
 }

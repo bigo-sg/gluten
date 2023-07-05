@@ -23,7 +23,11 @@ public:
     };
     using OutputFormatPtr = std::shared_ptr<OutputFormat>;
 
-    OutputFormatFile(DB::ContextPtr context_, const std::string & file_uri_, WriteBufferBuilderPtr write_buffer_builder_);
+    OutputFormatFile(
+        DB::ContextPtr context_,
+        const std::string & file_uri_,
+        WriteBufferBuilderPtr write_buffer_builder_,
+        std::vector<std::string> & preferred_column_names_);
 
     virtual ~OutputFormatFile() = default;
 
@@ -36,13 +40,17 @@ protected:
     DB::ContextPtr context;
     const std::string file_uri;
     WriteBufferBuilderPtr write_buffer_builder;
+    const std::vector<std::string> preferred_column_names;
 };
 using OutputFormatFilePtr = std::shared_ptr<OutputFormatFile>;
 
 class OutputFormatFileUtil
 {
 public:
-    static OutputFormatFilePtr
-    createFile(DB::ContextPtr context, WriteBufferBuilderPtr write_buffer_builder_, const std::string & file_uri_);
+    static OutputFormatFilePtr createFile(
+        DB::ContextPtr context,
+        WriteBufferBuilderPtr write_buffer_builder_,
+        const std::string & file_uri_,
+        std::vector<std::string> & preferred_column_names);
 };
 }

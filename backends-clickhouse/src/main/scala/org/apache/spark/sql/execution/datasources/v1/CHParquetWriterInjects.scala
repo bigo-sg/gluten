@@ -30,7 +30,7 @@ import scala.collection.JavaConverters._
 
 class CHParquetWriterInjects extends GlutenParquetWriterInjectsBase {
 
-  def createOutputWriterFactory = {
+  def createOutputWriterFactory: OutputWriterFactory = {
     new OutputWriterFactory {
       override def getFileExtension(context: TaskAttemptContext): String = {
         CodecConfig.from(context).getCodec.getExtension + ".parquet"
@@ -43,7 +43,8 @@ class CHParquetWriterInjects extends GlutenParquetWriterInjectsBase {
 
         val originPath = path
         val datasourceJniWrapper = new CHDatasourceJniWrapper();
-        val instance = datasourceJniWrapper.nativeInitFileWriterWrapper(path);
+        val instance =
+          datasourceJniWrapper.nativeInitFileWriterWrapper(path, dataSchema.fieldNames);
 
         new OutputWriter {
           override def write(row: InternalRow): Unit = {

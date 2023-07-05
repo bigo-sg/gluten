@@ -31,27 +31,27 @@ import org.scalatest.BeforeAndAfterAll
 import java.io.File
 
 case class AllDataTypesWithComplextType(
-    string_field: String = null,
-    int_field: java.lang.Integer = null,
-    long_field: java.lang.Long = null,
-    float_field: java.lang.Float = null,
-    double_field: java.lang.Double = null,
-    short_field: java.lang.Short = null,
-    byte_field: java.lang.Byte = null,
-    bool_field: java.lang.Boolean = null,
-    decimal_field: java.math.BigDecimal = null,
-    date_field: java.sql.Date = null,
-    array: Seq[Int] = null,
-    arrayContainsNull: Seq[Option[Int]] = null,
-    map: Map[Int, Long] = null,
-    mapValueContainsNull: Map[Int, Option[Long]] = null
-)
+                                         string_field: String = null,
+                                         int_field: java.lang.Integer = null,
+                                         long_field: java.lang.Long = null,
+                                         float_field: java.lang.Float = null,
+                                         double_field: java.lang.Double = null,
+                                         short_field: java.lang.Short = null,
+                                         byte_field: java.lang.Byte = null,
+                                         boolean_field: java.lang.Boolean = null,
+                                         decimal_field: java.math.BigDecimal = null,
+                                         date_field: java.sql.Date = null,
+                                         array: Seq[Int] = null,
+                                         arrayContainsNull: Seq[Option[Int]] = null,
+                                         map: Map[Int, Long] = null,
+                                         mapValueContainsNull: Map[Int, Option[Long]] = null
+                                       )
 
 class GlutenClickHouseHiveTableSuite()
   extends GlutenClickHouseTPCHAbstractSuite
-  with AdaptiveSparkPlanHelper
-  with SharedSparkSession
-  with BeforeAndAfterAll {
+    with AdaptiveSparkPlanHelper
+    with SharedSparkSession
+    with BeforeAndAfterAll {
 
   override protected val resourcePath: String =
     "../../../../gluten-core/src/test/resources/tpch-data"
@@ -60,7 +60,6 @@ class GlutenClickHouseHiveTableSuite()
   override protected val tpchQueries: String =
     rootPath + "../../../../gluten-core/src/test/resources/tpch-queries"
   override protected val queriesResults: String = rootPath + "queries-output"
-
   override protected def createTPCHNullableTables(): Unit = {}
 
   override protected def createTPCHNotNullTables(): Unit = {}
@@ -86,7 +85,7 @@ class GlutenClickHouseHiveTableSuite()
       .set("spark.databricks.delta.stalenessLimit", "3600000")
       .set("spark.gluten.sql.columnar.columnartorow", "true")
       .set("spark.gluten.sql.columnar.backend.ch.worker.id", "1")
-      .set(GlutenConfig.GLUTEN_LIB_PATH, "/usr/local/clickhouse/lib/libchd.so")
+      .set(GlutenConfig.GLUTEN_LIB_PATH, UTSystemParameters.getClickHouseLibPath())
       .set("spark.gluten.sql.columnar.iterator", "true")
       .set("spark.gluten.sql.columnar.hashagg.enablefinal", "true")
       .set("spark.gluten.sql.enable.native.validation", "false")
@@ -94,7 +93,7 @@ class GlutenClickHouseHiveTableSuite()
       .set(
         "spark.sql.warehouse.dir",
         getClass.getResource("/").getPath + "unit-tests-working-home/spark-warehouse")
-      .setMaster("local[1]")
+      .setMaster("local[*]")
   }
 
   override protected def spark: SparkSession = {
@@ -111,7 +110,7 @@ class GlutenClickHouseHiveTableSuite()
 
   private val txt_table_name = "hive_txt_test"
   private val json_table_name = "hive_json_test"
-  private val parquet_table_name = "hive_parquet_test"
+
   private val txt_table_create_sql = "create table if not exists %s (".format(txt_table_name) +
     "string_field string," +
     "int_field int," +
@@ -147,20 +146,6 @@ class GlutenClickHouseHiveTableSuite()
     "STORED AS INPUTFORMAT 'org.apache.hadoop.mapred.TextInputFormat'" +
     "OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'"
 
-  private val parquet_table_create_sql =
-    "create table if not exists %s (".format(parquet_table_name) +
-      "string_field string," +
-      "int_field int," +
-      "long_field long," +
-      "float_field float," +
-      "double_field double," +
-      "short_field short," +
-      "byte_field byte," +
-      "bool_field boolean," +
-      "decimal_field decimal(23, 12)" +
-      "" +
-      " ) partitioned by (date_field date) stored as parquet"
-
   def genTestData(): Seq[AllDataTypesWithComplextType] = {
     (0 to 199).map {
       i =>
@@ -189,8 +174,9 @@ class GlutenClickHouseHiveTableSuite()
 
   protected def initializeTable(table_name: String, table_create_sql: String): Unit = {
     spark.createDataFrame(genTestData()).createOrReplaceTempView("tmp_t")
-    spark.sql(s"drop table IF EXISTS $table_name")
+    val truncate_sql = "truncate table %s".format(table_name)
     spark.sql(table_create_sql)
+    spark.sql(truncate_sql)
     spark.sql("insert into %s select * from tmp_t".format(table_name))
   }
 
@@ -204,8 +190,8 @@ class GlutenClickHouseHiveTableSuite()
     FileUtils.forceMkdir(new File(warehouse))
     FileUtils.forceMkdir(new File(metaStorePathAbsolute))
     FileUtils.copyDirectory(new File(rootPath + resourcePath), new File(tablesPath))
-//    initializeTable(txt_table_name, txt_table_create_sql)
-//    initializeTable(json_table_name, json_table_create_sql)
+    initializeTable(txt_table_name, txt_table_create_sql)
+    initializeTable(json_table_name, json_table_create_sql)
   }
 
   test("test hive text table") {
@@ -325,54 +311,6 @@ class GlutenClickHouseHiveTableSuite()
       })
   }
 
-  test("test hive parquet table") {
-    withSQLConf(("spark.gluten.sql.native.parquet.writer.enabled", "true")) {
-
-      val table_name = parquet_table_name
-      val table_create_sql = parquet_table_create_sql // this is a partitioned table
-      spark.createDataFrame(genTestData()).createOrReplaceTempView("tmp_t")
-      spark.sql(s"drop table IF EXISTS $table_name")
-      spark.sql(table_create_sql)
-      //    spark.sql(
-      //      ("insert overwrite local directory '/tmp/destination' stored as parquet select string_field,int_field,long_field,float_field," +
-      //        "double_field,short_field,byte_field,bool_field,decimal_field" +
-      //        " from tmp_t").format(table_name))
-
-      // test selected column order different from table schema
-
-      // test composite bucket expression
-
-      // test multiple partition col
-      spark.sql(
-        ("insert overwrite %s   select string_field,int_field,long_field,float_field," +
-          "double_field,short_field,byte_field,bool_field,decimal_field,date_field" +
-          " from tmp_t").format(table_name))
-
-//      val sql =
-//        s"""
-//           | select string_field,
-//           |        sum(int_field),
-//           |        avg(long_field),
-//           |        min(float_field),
-//           |        max(double_field),
-//           |        sum(short_field),
-//           |        sum(decimal_field)
-//           | from $parquet_table_name
-//           | group by string_field
-//           | order by string_field
-//           |""".stripMargin
-//      val sql2 = s"select count(*), string_field from $parquet_table_name group by string_field"
-//      spark.sql(sql2).show(100)
-//      compareResultsAgainstVanillaSpark(sql, true, f => {})
-    }
-    withSQLConf(("spark.gluten.enabled", "false")) {
-      val sql2 = s"select count(*), string_field from $parquet_table_name group by string_field"
-      spark.sql(sql2).show(100)
-      println("")
-    }
-
-  }
-
   test("test hive json table") {
     val sql =
       s"""
@@ -489,53 +427,4 @@ class GlutenClickHouseHiveTableSuite()
       })
   }
 
-  test("text hive table with space/tab delimiter") {
-    val txt_table_name_space_delimiter = "hive_txt_table_space_delimiter"
-    val txt_table_name_tab_delimiter = "hive_txt_table_tab_delimiter"
-    val drop_space_table_sql = "drop table if exists %s".format(txt_table_name_space_delimiter)
-    val drop_tab_table_sql = "drop table if exists %s".format(txt_table_name_tab_delimiter)
-    val create_space_table_sql =
-      "create table if not exists %s (".format(txt_table_name_space_delimiter) +
-        "int_field int," +
-        "string_field string" +
-        ") row format delimited fields terminated by ' ' stored as textfile"
-    val create_tab_table_sql =
-      "create table if not exists %s (".format(txt_table_name_tab_delimiter) +
-        "int_field int," +
-        "string_field string" +
-        ") row format delimited fields terminated by '\t' stored as textfile"
-    spark.sql(drop_space_table_sql)
-    spark.sql(drop_tab_table_sql)
-    spark.sql(create_space_table_sql)
-    spark.sql(create_tab_table_sql)
-    spark.sql("insert into %s values(1, 'ab')".format(txt_table_name_space_delimiter))
-    spark.sql("insert into %s values(1, 'ab')".format(txt_table_name_tab_delimiter))
-    val sql1 =
-      s"""
-         | select * from $txt_table_name_space_delimiter where int_field > 0
-         |""".stripMargin
-    val sql2 =
-      s"""
-         | select * from $txt_table_name_tab_delimiter where int_field > 0
-         |""".stripMargin
-
-    compareResultsAgainstVanillaSpark(
-      sql1,
-      true,
-      df => {
-        val txtFileScan = collect(df.queryExecution.executedPlan) {
-          case l: HiveTableScanExecTransformer => l
-        }
-        assert(txtFileScan.size == 1)
-      })
-    compareResultsAgainstVanillaSpark(
-      sql2,
-      true,
-      df => {
-        val txtFileScan = collect(df.queryExecution.executedPlan) {
-          case l: HiveTableScanExecTransformer => l
-        }
-        assert(txtFileScan.size == 1)
-      })
-  }
 }

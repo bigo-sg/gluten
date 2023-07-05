@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution.datasources;
 
 public class CHDatasourceJniWrapper {
 
-    public native long nativeInitFileWriterWrapper(String filePath);
+    public native long nativeInitFileWriterWrapper(String filePath, String[] preferredColumnNames);
 
     //  public native void inspectSchema(long instanceId, long cSchemaAddress);
 
