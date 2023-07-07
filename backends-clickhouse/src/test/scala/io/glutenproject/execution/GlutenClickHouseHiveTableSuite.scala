@@ -31,27 +31,27 @@ import org.scalatest.BeforeAndAfterAll
 import java.io.File
 
 case class AllDataTypesWithComplextType(
-                                         string_field: String = null,
-                                         int_field: java.lang.Integer = null,
-                                         long_field: java.lang.Long = null,
-                                         float_field: java.lang.Float = null,
-                                         double_field: java.lang.Double = null,
-                                         short_field: java.lang.Short = null,
-                                         byte_field: java.lang.Byte = null,
-                                         boolean_field: java.lang.Boolean = null,
-                                         decimal_field: java.math.BigDecimal = null,
-                                         date_field: java.sql.Date = null,
-                                         array: Seq[Int] = null,
-                                         arrayContainsNull: Seq[Option[Int]] = null,
-                                         map: Map[Int, Long] = null,
-                                         mapValueContainsNull: Map[Int, Option[Long]] = null
-                                       )
+    string_field: String = null,
+    int_field: java.lang.Integer = null,
+    long_field: java.lang.Long = null,
+    float_field: java.lang.Float = null,
+    double_field: java.lang.Double = null,
+    short_field: java.lang.Short = null,
+    byte_field: java.lang.Byte = null,
+    boolean_field: java.lang.Boolean = null,
+    decimal_field: java.math.BigDecimal = null,
+    date_field: java.sql.Date = null,
+    array: Seq[Int] = null,
+    arrayContainsNull: Seq[Option[Int]] = null,
+    map: Map[Int, Long] = null,
+    mapValueContainsNull: Map[Int, Option[Long]] = null
+)
 
 class GlutenClickHouseHiveTableSuite()
   extends GlutenClickHouseTPCHAbstractSuite
-    with AdaptiveSparkPlanHelper
-    with SharedSparkSession
-    with BeforeAndAfterAll {
+  with AdaptiveSparkPlanHelper
+  with SharedSparkSession
+  with BeforeAndAfterAll {
 
   override protected val resourcePath: String =
     "../../../../gluten-core/src/test/resources/tpch-data"
@@ -554,4 +554,5 @@ class GlutenClickHouseHiveTableSuite()
         assert(txtFileScan.size == 1)
       })
   }
+   */
 }

@@ -17,11 +17,13 @@
 package io.glutenproject.execution
 
 import io.glutenproject.GlutenConfig
-import org.apache.commons.io.FileUtils
+
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanHelper
 import org.apache.spark.sql.test.SharedSparkSession
+
+import org.apache.commons.io.FileUtils
 import org.scalatest.BeforeAndAfterAll
 
 import java.io.File
@@ -252,7 +254,7 @@ class GlutenClickHouseWriteParquetTableSuite()
         ("short_field", "short"),
         ("byte_field", "byte"),
         ("boolean_field", "boolean"),
-        ("decimal_field", "decimal(23,12)"),
+        ("decimal_field", "decimal(23,12)")
       )
 
       val parquet_table_create_sql =
