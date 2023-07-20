@@ -15,23 +15,14 @@ extern const int NOT_IMPLEMENTED;
 
 namespace local_engine
 {
-String ParseURLParser::getCHFunctionName(const CommonFunctionInfo & func_info) const
+
+String ParseURLParser::getCHFunctionName(const substrait::Expression_ScalarFunction & substrait_func) const
 {
-    if (func_info.arguments.size() < 2)
+    if (substrait_func.arguments().size() < 2)
     {
         throw DB::Exception(DB::ErrorCodes::BAD_ARGUMENTS, "parse_url() expects at least 2 arguments");
     }
-    return selectCHFunctionName(func_info);
-}
-
-String ParseURLParser::getCHFunctionName(const DB::DataTypes &) const
-{
-    throw DB::Exception(DB::ErrorCodes::NOT_IMPLEMENTED, "Not implemented");
-}
-
-const DB::ActionsDAG::Node * ParseURLParser::parse(const CommonFunctionInfo & func_info, DB::ActionsDAGPtr & actions_dag) const
-{
-    return FunctionParser::parse(func_info, actions_dag);
+    return selectCHFunctionName(substrait_func);
 }
 
 String ParseURLParser::getQueryPartName(const substrait::Expression & expr) const
@@ -61,12 +52,12 @@ const static String CH_URL_HOST_FUNCTION = "spark_parse_url_host";
 const static String CH_URL_PARAMS_FUNCTION = "spark_parse_url_query";
 const static String CH_URL_ONE_PARAM_FUNCTION = "spark_parse_url_one_query";
 const static String CH_URL_INVALID_FUNCTION = "spark_parse_url_invalid";
-String ParseURLParser::selectCHFunctionName(const CommonFunctionInfo & func_info) const
+String ParseURLParser::selectCHFunctionName(const substrait::Expression_ScalarFunction & substrait_func) const
 {
-    auto query_part_name = getQueryPartName(func_info.arguments[1].value());
+    auto query_part_name = getQueryPartName(substrait_func.arguments(1).value());
     if (query_part_name == "QUERY")
     {
-        if (func_info.arguments.size() == 2)
+        if (substrait_func.arguments().size() == 2)
             return CH_URL_PARAMS_FUNCTION;
         else
             return CH_URL_ONE_PARAM_FUNCTION;
@@ -93,28 +84,29 @@ String ParseURLParser::selectCHFunctionName(const CommonFunctionInfo & func_info
 }
 
 DB::ActionsDAG::NodeRawConstPtrs ParseURLParser::parseFunctionArguments(
-    const CommonFunctionInfo & func_info, const String & /*ch_func_name*/, DB::ActionsDAGPtr & actions_dag) const
+    const substrait::Expression_ScalarFunction & substrait_func, const String & /*ch_func_name*/, DB::ActionsDAGPtr & actions_dag) const
 {
     DB::ActionsDAG::NodeRawConstPtrs arg_nodes;
-    arg_nodes.push_back(parseExpression(actions_dag, func_info.arguments[0].value()));
-    for (Int32 i = 2; i < func_info.arguments.size(); ++i)
+    arg_nodes.push_back(parseExpression(actions_dag, substrait_func.arguments(0).value()));
+    for (Int32 i = 2; i < substrait_func.arguments().size(); ++i)
     {
-        arg_nodes.push_back(parseExpression(actions_dag, func_info.arguments[i].value()));
+        arg_nodes.push_back(parseExpression(actions_dag, substrait_func.arguments(i).value()));
     }
     return arg_nodes;
 }
 
 const DB::ActionsDAG::Node * ParseURLParser::convertNodeTypeIfNeeded(
-    const CommonFunctionInfo & func_info, const DB::ActionsDAG::Node * func_node, DB::ActionsDAGPtr & actions_dag) const
+    const substrait::Expression_ScalarFunction & substrait_func, const DB::ActionsDAG::Node * func_node, DB::ActionsDAGPtr & actions_dag) const
 {
-    auto ch_function_name = getCHFunctionName(func_info);
+    auto ch_function_name = getCHFunctionName(substrait_func);
     if (ch_function_name != CH_URL_PROTOL_FUNCTION)
     {
         return func_node;
     }
     // Empty string is converted to NULL.
     auto str_type = std::make_shared<DB::DataTypeString>();
-    const auto * empty_str_node = &actions_dag->addColumn(ColumnWithTypeAndName(str_type->createColumnConst(1, DB::Field("")), str_type, getUniqueName("")));
+    const auto * empty_str_node
+        = &actions_dag->addColumn(ColumnWithTypeAndName(str_type->createColumnConst(1, DB::Field("")), str_type, getUniqueName("")));
     return toFunctionNode(actions_dag, "nullIf", {func_node, empty_str_node});
 }
 
