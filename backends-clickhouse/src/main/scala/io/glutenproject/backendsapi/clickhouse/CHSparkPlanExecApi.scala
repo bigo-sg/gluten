@@ -358,10 +358,12 @@ class CHSparkPlanExecApi extends SparkPlanExecApi {
    */
   override def genExtendedOptimizers(): List[SparkSession => Rule[LogicalPlan]] = {
     var optimizers = List.empty[SparkSession => Rule[LogicalPlan]]
+    /*
     if (GlutenConfig.getConf.enableCommonSubexpressionEliminate) {
       optimizers = optimizers :+ (
         spark => new CommonSubexpressionEliminateRule(spark, spark.sessionState.conf))
     }
+     */
     optimizers
   }
 

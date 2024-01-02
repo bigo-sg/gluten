@@ -203,6 +203,10 @@ class ClickHouseTestSettings extends BackendTestSettings {
     .exclude("session window groupBy with multiple keys statement - keys overlapped with sessions")
     .exclude("session window with multi-column projection")
     .exclude("SPARK-36724: Support timestamp_ntz as a type of time column for SessionWindow")
+
+  enableSuite[GlutenDataFrameSetOperationsSuite]
+    .include("except all")
+  /*
   enableSuite[GlutenDataFrameSetOperationsSuite]
     .exclude("SPARK-10740: handle nondeterministic expressions correctly for set operations")
     .exclude(
@@ -225,6 +229,7 @@ class ClickHouseTestSettings extends BackendTestSettings {
     .exclude("exceptAll - nullability")
     .exclude("intersectAll")
     .exclude("intersectAll - nullability")
+   */
   enableSuite[GlutenDataFrameStatSuite]
   enableSuite[GlutenDataFrameSuite]
     .exclude("Uuid expressions should produce same results at retries in the same DataFrame")
