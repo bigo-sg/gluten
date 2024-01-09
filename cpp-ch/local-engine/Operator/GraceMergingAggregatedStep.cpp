@@ -104,12 +104,14 @@ GraceMergingAggregatedTransform::GraceMergingAggregatedTransform(const DB::Block
     , context(context_)
     , tmp_data_disk(std::make_unique<DB::TemporaryDataOnDisk>(context_->getTempDataOnDisk()))
 {
-    max_buckets = context->getConfigRef().getUInt64("max_grace_merging_buckets", 32);
-    throw_on_overflow_buckets = context->getConfigRef().getBool("throw_on_overflow_grace_merging_buckets", false);
-    aggregated_keys_before_extend_buckets = context->getConfigRef().getUInt64("aggregated_keys_before_extend_grace_merging_buckets", 8196);
+    max_buckets = context->getConfigRef().getUInt64("max_grace_aggregate_merging_buckets", 32);
+    throw_on_overflow_buckets = context->getConfigRef().getBool("throw_on_overflow_grace_aggregate_merging_buckets", false);
+    aggregated_keys_before_extend_buckets
+        = context->getConfigRef().getUInt64("aggregated_keys_before_extend_grace_aggregate_merging_buckets", 8196);
     aggregated_keys_before_extend_buckets = PODArrayUtil::adjustMemoryEfficientSize(aggregated_keys_before_extend_buckets);
-    max_pending_flush_blocks_per_bucket = context->getConfigRef().getUInt64("max_pending_flush_blocks_per_grace_merging_bucket", 1024 * 1024);
-    max_allowed_memory_usage_ratio = context->getConfigRef().getDouble("max_allowed_memory_usage_ratio", 0.9);
+    max_pending_flush_blocks_per_bucket
+        = context->getConfigRef().getUInt64("max_pending_flush_blocks_per_grace_aggregate_merging_buckets", 1024 * 1024);
+    max_allowed_memory_usage_ratio = context->getConfigRef().getDouble("max_allowed_memory_usage_ratio_grace_aggregate_merging", 0.9);
     // bucket 0 is for in-memory data, it's just a placeholder.
     buckets.emplace(0, BufferFileStream());
 
@@ -447,12 +449,6 @@ void GraceMergingAggregatedTransform::checkAndSetupCurrentDataVariants()
     if (!current_data_variants)
     {
         current_data_variants = std::make_shared<DB::AggregatedDataVariants>();
-        if (last_data_variants_size)
-        {
-            // it's helpful to cut the overhead of changing single level hash table into two level
-            // and rehashing the hash table.
-            current_data_variants->init(last_data_variants_type, last_data_variants_size);
-        }
         no_more_keys = false;
     }
 }
@@ -517,12 +513,13 @@ bool GraceMergingAggregatedTransform::isMemoryOverflow()
         {
             LOG_INFO(
                 logger,
-                "Memory is overflow. current_mem_used: {}, max_mem_used: {}, per_key_memory_usage: {}, aggregator keys: {}, buckets: {}",
+                "Memory is overflow. current_mem_used: {}, max_mem_used: {}, per_key_memory_usage: {}, aggregator keys: {}, buckets: {}, hash table type: {}",
                 ReadableSize(current_mem_used),
                 ReadableSize(max_mem_used),
                 ReadableSize(per_key_memory_usage),
                 current_result_rows,
-                getBucketsNum());
+                getBucketsNum(),
+                current_data_variants->type);
             return true;
         }
     }
@@ -532,11 +529,12 @@ bool GraceMergingAggregatedTransform::isMemoryOverflow()
         {
             LOG_INFO(
                 logger,
-                "Memory is overflow on half of max usage. current_mem_used: {}, max_mem_used: {}, aggregator keys: {}, buckets: {}",
+                "Memory is overflow on half of max usage. current_mem_used: {}, max_mem_used: {}, aggregator keys: {}, buckets: {}, hash table type: {}",
                 ReadableSize(current_mem_used),
                 ReadableSize(max_mem_used),
                 current_result_rows,
-                getBucketsNum());
+                getBucketsNum(),
+                current_data_variants->type);
             return true;
         }
     }
