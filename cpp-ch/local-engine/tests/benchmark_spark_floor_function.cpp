@@ -237,7 +237,20 @@ template<typename T>
 using PaddedPODArray = std::vector<T>;
 */
 
+
 /*
+Test performance of fillConstantConstant*
+Benchmark when BranchType is Int64
+-------------------------------------------------------------------
+Benchmark                         Time             CPU   Iterations
+-------------------------------------------------------------------
+BM_fillConstantConstant1      31360 ns        31359 ns        22249
+BM_fillConstantConstant2      31369 ns        31368 ns        22288
+BM_fillConstantConstant3      31583 ns        31581 ns        22254
+*/
+
+/*
+Test performance of fillVectorVector*
 Benchmark when BranchType is Float64
 ---------------------------------------------------------------
 Benchmark                     Time             CPU   Iterations
@@ -291,15 +304,68 @@ objdump -t  ./build_gcc/utils/extern-local-engine/tests/benchmark_local_engine  
 gdb -batch -ex "disassemble/rs 'void fillVectorVector3<double, double>(DB::PODArray<char8_t, 4096ul, Allocator<false, false>, 63ul, 64ul> const&, DB::PODArray<double, 4096ul, Allocator<false, false>, 63ul, 64ul> const&, DB::PODArray<double, 4096ul, Allocator<false, false>, 63ul, 64ul> const&, DB::PODArray<double, 4096ul, Allocator<false, false>, 63ul, 64ul>&)'" ./build_gcc/utils/extern-local-engine/tests/benchmark_local_engine    | c++filt  > 3.S
 */
 
-using ResultType = Decimal64;
+using ResultType = Float64;
 
-template <typename Branch1Type = ResultType, typename Branch2Type = ResultType>
-static NO_INLINE void fillVectorVector0(const PaddedPODArray<UInt8> & cond, Branch1Type a, Branch2Type b, PaddedPODArray<ResultType> & res)
+template <typename T>
+static NO_INLINE void fillConstantConstant1(const PaddedPODArray<UInt8> & cond, T a, T b, PaddedPODArray<T> & res)
 {
     size_t rows = cond.size();
     for (size_t i = 0; i < rows; ++i)
     {
-        res[i] = cond[i] ? static_cast<ResultType>(a) : static_cast<ResultType>(b);
+        res[i] = cond[i] ? static_cast<T>(a) : static_cast<T>(b);
+    }
+}
+
+template <typename T>
+static NO_INLINE void
+fillConstantConstant3(const PaddedPODArray<UInt8> & cond, T a, T b, PaddedPODArray<T> & res)
+{
+    size_t rows = cond.size();
+    T new_a = static_cast<T>(a);
+    T new_b = static_cast<T>(b);
+    alignas(64) const T ab[2] = {new_a, new_b};
+    for (size_t i = 0; i < rows; ++i)
+    {
+        if constexpr (std::is_integral_v<T> && sizeof(T) == 1)
+        {
+            /// auto opt: cmove and simd is used for integral types
+            // res[i] = cond[i] ? new_a : new_b;
+            res[i] = ab[!cond[i]];
+        }
+        else if constexpr (std::is_floating_point_v<T>)
+        {
+            /// auto opt: cmove not used but simd is used for floating point types
+            res[i] = cond[i] ? new_a : new_b;
+        }
+        else if constexpr (is_decimal<T> && sizeof(T) <= 8)
+        {
+            /// auto opt: simd is used for decimal types
+            res[i] = cond[i] ? new_a : new_b;
+        }
+        else if constexpr (is_decimal<T> && sizeof(T) == 32)
+        {
+            /// avoid branch mispredict
+            res[i] = ab[!cond[i]];
+        }
+        else if constexpr (is_decimal<T> && sizeof(T) == 16)
+        {
+            /// auto opt: cmove and loop unrolling
+            // res[i] = cond[i] ? static_cast<T>(a) : static_cast<T>(b);
+            res[i] = ab[!cond[i]];
+        }
+        else if constexpr (is_big_int_v<T> && sizeof(T) == 32)
+        {
+            res[i] = ab[!cond[i]];
+        }
+        else if constexpr (is_big_int_v<T> && sizeof(T) == 16)
+        {
+            // res[i] = cond[i] ? static_cast<T>(a) : static_cast<T>(b);
+            res[i] = ab[!cond[i]];
+        }
+        else
+        {
+            res[i] = cond[i] ? static_cast<T>(a) : static_cast<T>(b);
+        }
     }
 }
 
@@ -327,7 +393,7 @@ static NO_INLINE void fillVectorVector2(
     size_t rows = cond.size();
     for (size_t i = 0; i < rows; ++i)
     {
-        res[i] = (!!cond[i]) * static_cast<ResultType>(a[i]) + (!cond[i]) * static_cast<ResultType>(b[i]);
+        // res[i] = (!!cond[i]) * static_cast<ResultType>(a[i]) + (!cond[i]) * static_cast<ResultType>(b[i]);
     }
 }
 
@@ -343,7 +409,7 @@ static NO_INLINE void fillVectorVector3(
     {
         if constexpr (std::is_integral_v<ResultType> || (is_decimal<ResultType> && sizeof(ResultType) <= 8))
         {
-            res[i] = (!!cond[i]) * static_cast<ResultType>(a[i]) + (!cond[i]) * static_cast<ResultType>(b[i]);
+            // res[i] = (!!cond[i]) * static_cast<ResultType>(a[i]) + (!cond[i]) * static_cast<ResultType>(b[i]);
         }
         else if constexpr (std::is_floating_point_v<ResultType>)
         {
@@ -382,18 +448,34 @@ static void initBranch(PaddedPODArray<T> & branch)
     }
 }
 
-
-static void BM_fillVectorVector0(benchmark::State & state)
+template <typename T = ResultType>
+static void BM_fillConstantConstant1(benchmark::State & state)
 {
     PaddedPODArray<UInt8> cond;
-    ResultType a = std::rand();
-    ResultType b = std::rand();
-    PaddedPODArray<ResultType> res(ROWS);
+    T a(std::rand());
+    T b(std::rand());
+    PaddedPODArray<T> res(ROWS);
     initCondition(cond);
 
     for (auto _ : state)
     {
-        fillVectorVector0(cond, a, b, res);
+        fillConstantConstant1(cond, a, b, res);
+        benchmark::DoNotOptimize(res);
+    }
+}
+
+template <typename T = ResultType>
+static void BM_fillConstantConstant3(benchmark::State & state)
+{
+    PaddedPODArray<UInt8> cond;
+    T a(std::rand());
+    T b(std::rand());
+    PaddedPODArray<T> res(ROWS);
+    initCondition(cond);
+
+    for (auto _ : state)
+    {
+        fillConstantConstant3(cond, a, b, res);
         benchmark::DoNotOptimize(res);
     }
 }
@@ -449,7 +531,66 @@ static void BM_fillVectorVector3(benchmark::State & state)
     }
 }
 
-BENCHMARK(BM_fillVectorVector0);
+/*
+-------------------------------------------------------------------------------
+Benchmark                                     Time             CPU   Iterations
+-------------------------------------------------------------------------------
+BM_fillConstantConstant1<Int8>           492635 ns       492619 ns         1415
+BM_fillConstantConstant3<Int8>            80339 ns        80336 ns         8803
+BM_fillConstantConstant1<Int16>            7899 ns         7899 ns        88745
+BM_fillConstantConstant3<Int16>            7903 ns         7903 ns        88738
+BM_fillConstantConstant1<Int32>           15704 ns        15703 ns        44615
+BM_fillConstantConstant3<Int32>           15849 ns        15848 ns        44592
+BM_fillConstantConstant1<Int64>           31443 ns        31442 ns        22226
+BM_fillConstantConstant3<Int64>           31407 ns        31406 ns        22304
+BM_fillConstantConstant1<Int128>          95711 ns        95709 ns         7317
+BM_fillConstantConstant3<Int128>          91466 ns        91463 ns         7657
+BM_fillConstantConstant1<Int256>         565219 ns       565201 ns         1233
+BM_fillConstantConstant3<Int256>         131145 ns       131140 ns         5350
+BM_fillConstantConstant1<Float32>         15768 ns        15768 ns        44554
+BM_fillConstantConstant3<Float32>         15685 ns        15684 ns        44597
+BM_fillConstantConstant1<Float64>         31377 ns        31376 ns        22281
+BM_fillConstantConstant3<Float64>         31367 ns        31366 ns        22307
+BM_fillConstantConstant1<Decimal32>       65185 ns        65182 ns        10912
+BM_fillConstantConstant3<Decimal32>       15703 ns        15702 ns        44490
+BM_fillConstantConstant1<Decimal64>       64509 ns        64507 ns        10875
+BM_fillConstantConstant3<Decimal64>       31839 ns        31838 ns        22305
+BM_fillConstantConstant1<Decimal128>      95602 ns        95600 ns         7325
+BM_fillConstantConstant3<Decimal128>      91615 ns        91612 ns         7646
+BM_fillConstantConstant1<Decimal256>     572220 ns       572208 ns         1234
+BM_fillConstantConstant3<Decimal256>     130326 ns       130323 ns         5375
+BM_fillConstantConstant1<DateTime64>      64597 ns        64596 ns        10844
+BM_fillConstantConstant3<DateTime64>      64964 ns        64963 ns        10885
+*/
+BENCHMARK_TEMPLATE(BM_fillConstantConstant1, Int8);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant3, Int8);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant1, Int16);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant3, Int16);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant1, Int32);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant3, Int32);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant1, Int64);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant3, Int64);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant1, Int128);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant3, Int128);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant1, Int256);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant3, Int256);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant1, Float32);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant3, Float32);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant1, Float64);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant3, Float64);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant1, Decimal32);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant3, Decimal32);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant1, Decimal64);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant3, Decimal64);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant1, Decimal128);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant3, Decimal128);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant1, Decimal256);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant3, Decimal256);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant1, DateTime64);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant3, DateTime64);
+
+
+
 BENCHMARK(BM_fillVectorVector1);
 BENCHMARK(BM_fillVectorVector2);
 BENCHMARK(BM_fillVectorVector3);
