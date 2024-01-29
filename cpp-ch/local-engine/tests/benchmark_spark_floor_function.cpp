@@ -562,16 +562,28 @@ BM_fillConstantConstant3<Decimal256>     130326 ns       130323 ns         5375
 BM_fillConstantConstant1<DateTime64>      64597 ns        64596 ns        10844
 BM_fillConstantConstant3<DateTime64>      64964 ns        64963 ns        10885
 */
+BENCHMARK_TEMPLATE(BM_fillConstantConstant1, UInt8);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant3, UInt8);
 BENCHMARK_TEMPLATE(BM_fillConstantConstant1, Int8);
 BENCHMARK_TEMPLATE(BM_fillConstantConstant3, Int8);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant1, UInt16);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant3, UInt16);
 BENCHMARK_TEMPLATE(BM_fillConstantConstant1, Int16);
 BENCHMARK_TEMPLATE(BM_fillConstantConstant3, Int16);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant1, UInt32);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant3, UInt32);
 BENCHMARK_TEMPLATE(BM_fillConstantConstant1, Int32);
 BENCHMARK_TEMPLATE(BM_fillConstantConstant3, Int32);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant1, UInt64);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant3, UInt64);
 BENCHMARK_TEMPLATE(BM_fillConstantConstant1, Int64);
 BENCHMARK_TEMPLATE(BM_fillConstantConstant3, Int64);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant1, UInt128);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant3, UInt128);
 BENCHMARK_TEMPLATE(BM_fillConstantConstant1, Int128);
 BENCHMARK_TEMPLATE(BM_fillConstantConstant3, Int128);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant1, UInt256);
+BENCHMARK_TEMPLATE(BM_fillConstantConstant3, UInt256);
 BENCHMARK_TEMPLATE(BM_fillConstantConstant1, Int256);
 BENCHMARK_TEMPLATE(BM_fillConstantConstant3, Int256);
 BENCHMARK_TEMPLATE(BM_fillConstantConstant1, Float32);
@@ -589,8 +601,51 @@ BENCHMARK_TEMPLATE(BM_fillConstantConstant3, Decimal256);
 BENCHMARK_TEMPLATE(BM_fillConstantConstant1, DateTime64);
 BENCHMARK_TEMPLATE(BM_fillConstantConstant3, DateTime64);
 
-
-
 BENCHMARK(BM_fillVectorVector1);
 BENCHMARK(BM_fillVectorVector2);
 BENCHMARK(BM_fillVectorVector3);
+
+
+template <typename T>
+struct slice
+{
+    T * data;
+};
+
+template <typename T>
+NO_INLINE auto BitOrProcess(slice<T> & d)
+{
+    for (auto i = 0u; i < 65536; ++i)
+        d.data[i] |= T(0xaa);
+}
+
+template <typename T>
+void initSlice(slice<T> & d)
+{
+    d.data = new T[65536];
+    for (auto i = 0u; i < 65536; ++i)
+        d.data[i] = T(std::rand());
+}
+
+template <typename T>
+void finalizeSlice(slice<T> & d)
+{
+    delete[] d.data;
+}
+
+template <typename T>
+void BM_BitOrProcess(benchmark::State & state)
+{
+    slice<T> d;
+    initSlice(d);
+
+    for (auto _ : state)
+    {
+        BitOrProcess(d);
+        benchmark::DoNotOptimize(d);
+    }
+}
+
+BENCHMARK_TEMPLATE(BM_BitOrProcess, char8_t);
+BENCHMARK_TEMPLATE(BM_BitOrProcess, int8_t);
+BENCHMARK_TEMPLATE(BM_BitOrProcess, uint8_t);
