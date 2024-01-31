@@ -418,7 +418,12 @@ static NO_INLINE void fillVectorVector3(
             auto mask = static_cast<UIntType>(static_cast<IntType>(cond[i]) - 1);
             auto new_a = static_cast<ResultType>(a[i]);
             auto new_b = static_cast<ResultType>(b[i]);
-            auto tmp = (~mask & (*reinterpret_cast<const UIntType *>(&new_a))) | (mask & (*reinterpret_cast<const UIntType *>(&new_b)));
+            UIntType uint_a;
+            std::memcpy(&uint_a, &new_a, sizeof(UIntType));
+            UIntType uint_b;
+            std::memcpy(&uint_b, &new_b, sizeof(UIntType));
+            UIntType tmp = (~mask & uint_a) | (mask & uint_b);
+            // auto tmp = (~mask & (*reinterpret_cast<const UIntType *>(&new_a))) | (mask & (*reinterpret_cast<const UIntType *>(&new_b)));
             res[i] = *(reinterpret_cast<ResultType *>(&tmp));
         }
         else
