@@ -186,13 +186,13 @@ struct MySumData
                                       else if constexpr (is_integer<T>)
                                       {
                                           T local_sum{};
-                                          using MaskType = std::conditional_t<sizeof(T) == 16, Int8, Int64>;
+                                          using MaskType = std::conditional_t<sizeof(T) == 16, Int8, Int8>;
                                           alignas(64) const MaskType masks[2] = {0, -1};
                                           while (ptr < end_ptr)
                                           {
                                               Value v = *ptr;
                                               if constexpr (!add_if_zero)
-                                                  v &= masks[*condition_map];
+                                                  v &= masks[!!*condition_map];
                                               else
                                                   v &= masks[!*condition_map];
 
@@ -206,13 +206,13 @@ struct MySumData
                                       else if constexpr (is_decimal<T>)
                                       {
                                           T local_sum{};
-                                          using MaskType = std::conditional_t<sizeof(T) == 16, Int8, Int64>;
+                                          using MaskType = std::conditional_t<sizeof(T) == 16, Int8, Int8>;
                                           alignas(64) const MaskType masks[2] = {0, -1};
                                           while (ptr < end_ptr)
                                           {
                                               Value v = *ptr;
                                               if constexpr (!add_if_zero)
-                                                  v.value &= masks[*condition_map];
+                                                  v.value &= masks[!!*condition_map];
                                               else
                                                   v.value &= masks[!*condition_map];
 
