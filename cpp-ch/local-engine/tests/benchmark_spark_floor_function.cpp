@@ -654,3 +654,84 @@ void BM_BitOrProcess(benchmark::State & state)
 BENCHMARK_TEMPLATE(BM_BitOrProcess, char8_t);
 BENCHMARK_TEMPLATE(BM_BitOrProcess, int8_t);
 BENCHMARK_TEMPLATE(BM_BitOrProcess, uint8_t);
+
+MULTITARGET_FUNCTION_AVX512BW_AVX512F_AVX2_SSE42(
+MULTITARGET_FUNCTION_HEADER(static void NO_INLINE), isNotNull, MULTITARGET_FUNCTION_BODY((const PaddedPODArray<UInt8> & null_map, PaddedPODArray<UInt8> & res) /// NOLINT
+{
+    for (size_t i = 0; i < 65536; ++i)
+        res[i] = !null_map[i];
+}))
+
+
+
+#define BENCHMARK_ISNOTNULL_TEMPLATE(TARGET) \
+static void BM_isNotNull##TARGET(benchmark::State & state) \
+{ \
+    PaddedPODArray<UInt8> null_map; \
+    initCondition(null_map); \
+    for (auto _ : state) \
+    { \
+        PaddedPODArray<UInt8> res(ROWS); \
+        isNotNull##TARGET(null_map, res); \
+        benchmark::DoNotOptimize(res); \
+    } \
+} \
+BENCHMARK(BM_isNotNull##TARGET);
+
+BENCHMARK_ISNOTNULL_TEMPLATE()
+BENCHMARK_ISNOTNULL_TEMPLATE(SSE42)
+BENCHMARK_ISNOTNULL_TEMPLATE(AVX2)
+BENCHMARK_ISNOTNULL_TEMPLATE(AVX512F)
+BENCHMARK_ISNOTNULL_TEMPLATE(AVX512BW)
+
+MULTITARGET_FUNCTION_AVX512BW_AVX512F_AVX2_SSE42(
+MULTITARGET_FUNCTION_HEADER(static void NO_INLINE), isNotNullTest, MULTITARGET_FUNCTION_BODY((const PaddedPODArray<UInt8> & null_map, PaddedPODArray<UInt8> & res) /// NOLINT
+{
+    res.reserve(ROWS);
+    for (size_t i = 0; i < ROWS; ++i)
+        res.push_back(!null_map[i]);
+}))
+
+
+#define BENCHMARK_ISNOTNULLTEST_TEMPLATE(TARGET) \
+static void BM_isNotNullTest##TARGET(benchmark::State & state) \
+{ \
+    PaddedPODArray<UInt8> null_map; \
+    initCondition(null_map); \
+    for (auto _ : state) \
+    { \
+        PaddedPODArray<UInt8> res; \
+        isNotNullTest##TARGET(null_map, res); \
+        benchmark::DoNotOptimize(res); \
+    } \
+} \
+BENCHMARK(BM_isNotNullTest##TARGET);
+
+BENCHMARK_ISNOTNULLTEST_TEMPLATE()
+BENCHMARK_ISNOTNULLTEST_TEMPLATE(SSE42)
+BENCHMARK_ISNOTNULLTEST_TEMPLATE(AVX2)
+BENCHMARK_ISNOTNULLTEST_TEMPLATE(AVX512F)
+BENCHMARK_ISNOTNULLTEST_TEMPLATE(AVX512BW)
+
+/*
+Run on (32 X 2100 MHz CPU s)
+CPU Caches:
+  L1 Data 32 KiB (x16)
+  L1 Instruction 32 KiB (x16)
+  L2 Unified 1024 KiB (x16)
+  L3 Unified 11264 KiB (x2)
+Load Average: 4.47, 4.43, 4.74
+-------------------------------------------------------------------
+Benchmark                         Time             CPU   Iterations
+-------------------------------------------------------------------
+BM_isNotNull                   3854 ns         3854 ns       181463
+BM_isNotNullSSE42              3859 ns         3859 ns       181243
+BM_isNotNullAVX2               3037 ns         3037 ns       232898
+BM_isNotNullAVX512F            2859 ns         2859 ns       245235
+BM_isNotNullAVX512BW           2880 ns         2880 ns       244221
+BM_isNotNullTest              95141 ns        95139 ns         7342
+BM_isNotNullTestSSE42         95201 ns        95199 ns         7322
+BM_isNotNullTestAVX2          95107 ns        95105 ns         7362
+BM_isNotNullTestAVX512F       95151 ns        95147 ns         7370
+BM_isNotNullTestAVX512BW      95150 ns        95148 ns         7348
+*/
