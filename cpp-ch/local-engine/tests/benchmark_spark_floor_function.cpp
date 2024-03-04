@@ -15,26 +15,42 @@
  * limitations under the License.
  */
 
+#include <cstddef>
 #if USE_MULTITARGET_CODE
 #include <immintrin.h>
 #endif
 
 #include <Columns/IColumn.h>
 #include <Core/Block.h>
+#include <DataTypes/DataTypeArray.h>
 #include <DataTypes/DataTypeFactory.h>
 #include <DataTypes/IDataType.h>
 #include <Functions/FunctionFactory.h>
 #include <Functions/FunctionsRound.h>
 #include <Functions/SparkFunctionFloor.h>
 #include <Parser/SerializedPlanParser.h>
+#include <base/types.h>
 #include <benchmark/benchmark.h>
 #include <Common/TargetSpecific.h>
 
 using namespace DB;
 
-static Block createDataBlock(String type_str, size_t rows)
+static ColumnPtr createDataBlockImpl(const DataTypePtr & type, size_t rows)
 {
-    auto type = DataTypeFactory::instance().get(type_str);
+    const auto * type_array = typeid_cast<const DataTypeArray *>(type.get());
+    if (type_array)
+    {
+        auto data_col = createDataBlockImpl(type_array->getNestedType(), rows);
+        auto offset_col = ColumnArray::ColumnOffsets::create(rows);
+        auto & offsets = offset_col->getData();
+        for (size_t i = 0; i < data_col->size(); ++i)
+            offsets[i] = offsets[i - 1] + (rand() % 10);
+        auto new_data_col = data_col->replicate(offsets);
+
+        return ColumnArray::create(std::move(new_data_col), std::move(offset_col));
+    }
+
+    auto type_not_nullable = removeNullable(type);
     auto column = type->createColumn();
     for (size_t i = 0; i < rows; ++i)
     {
@@ -42,16 +58,33 @@ static Block createDataBlock(String type_str, size_t rows)
         {
             column->insertDefault();
         }
-        else if (isInt(type))
+        else if (isInt(type_not_nullable))
         {
             column->insert(i);
         }
-        else if (isFloat(type))
+        else if (isFloat(type_not_nullable))
         {
             double d = i * 1.0;
             column->insert(d);
         }
+        else if (isString(type_not_nullable))
+        {
+            String s = "helloworld";
+            column->insert(s);
+        }
+        else
+        {
+            column->insertDefault();
+        }
     }
+    return std::move(column);
+}
+
+static Block createDataBlock(const String & type_str, size_t rows)
+{
+    auto type = DataTypeFactory::instance().get(type_str);
+    auto column = createDataBlockImpl(type, rows);
+
     Block block;
     block.insert(ColumnWithTypeAndName(std::move(column), type, "d"));
     return std::move(block);
@@ -735,3 +768,76 @@ BM_isNotNullTestAVX2          95107 ns        95105 ns         7362
 BM_isNotNullTestAVX512F       95151 ns        95147 ns         7370
 BM_isNotNullTestAVX512BW      95150 ns        95148 ns         7348
 */
+
+
+static NO_INLINE void insertManyFrom(IColumn & dst, const IColumn & src)
+{
+    size_t size = src.size();
+    dst.insertManyFrom(src, size/2, size);
+}
+
+/*
+static NO_INLINE void insertManyFromV1(IColumn & dst, const IColumn & src)
+{
+    size_t size = src.size();
+    ColumnNullable * dst_nullable = typeid_cast<ColumnNullable *>(&dst);
+    ColumnVector<Int64> * dst_nested = typeid_cast<ColumnVector<Int64> *>(&dst_nullable->getNestedColumn());
+    auto & dst_data = dst_nested->getData();
+    auto & dst_null_map = dst_nullable->getNullMapData();
+
+    auto src_field = src[size/2];
+    if (src_field.isNull())
+    {
+        dst_data.resize_fill(size, 0);
+        dst_null_map.resize_fill(size, 1);
+    }
+    else
+    {
+        auto src_value = src_field.get<Int64>();
+        dst_data.resize_fill(size, src_value);
+        dst_null_map.resize_fill(size, 0);
+    }
+}
+*/
+
+template <const std::string & str_type>
+static void BM_insertManyFrom(benchmark::State & state)
+{
+    auto type = DataTypeFactory::instance().get(str_type);
+    auto src = createDataBlockImpl(type, ROWS);
+
+    for (auto _ : state)
+    {
+        state.PauseTiming();
+        auto dst = type->createColumn();
+        dst->reserve(ROWS);
+        state.ResumeTiming();
+
+        insertManyFrom(*dst, *src);
+        benchmark::DoNotOptimize(dst);
+    }
+}
+
+static const String type_int64 = "Int64";
+static const String type_nullable_int64 = "Nullable(Int64)";
+static const String type_string = "String";
+static const String type_nullable_string = "Nullable(String)";
+static const String type_decimal = "Decimal128(3)";
+static const String type_nullable_decimal = "Nullable(Decimal128(3))";
+
+static const String type_array_int64 = "Array(Int64)";
+static const String type_array_nullable_int64 = "Array(Nullable(Int64))";
+static const String type_array_string = "Array(String)";
+static const String type_array_nullable_string = "Array(Nullable(String))";
+
+BENCHMARK_TEMPLATE(BM_insertManyFrom, type_int64);
+BENCHMARK_TEMPLATE(BM_insertManyFrom, type_nullable_int64);
+BENCHMARK_TEMPLATE(BM_insertManyFrom, type_string);
+BENCHMARK_TEMPLATE(BM_insertManyFrom, type_nullable_string);
+BENCHMARK_TEMPLATE(BM_insertManyFrom, type_decimal);
+BENCHMARK_TEMPLATE(BM_insertManyFrom, type_nullable_decimal);
+
+BENCHMARK_TEMPLATE(BM_insertManyFrom, type_array_int64);
+BENCHMARK_TEMPLATE(BM_insertManyFrom, type_array_nullable_int64);
+BENCHMARK_TEMPLATE(BM_insertManyFrom, type_array_string);
+BENCHMARK_TEMPLATE(BM_insertManyFrom, type_array_nullable_string);
