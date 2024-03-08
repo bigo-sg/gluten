@@ -35,13 +35,21 @@
 
 using namespace DB;
 
-static ColumnPtr createDataBlockImpl(const DataTypePtr & type, size_t rows)
+static IColumn::Offsets createOffsets(size_t rows)
+{
+    IColumn::Offsets offsets(rows, 0);
+    for (size_t i = 0; i < rows; ++i)
+        offsets[i] = offsets[i-1] + (rand() % 10);
+    return std::move(offsets);
+}
+
+static ColumnPtr createColumn(const DataTypePtr & type, size_t rows)
 {
     const auto * type_array = typeid_cast<const DataTypeArray *>(type.get());
     if (type_array)
     {
-        auto data_col = createDataBlockImpl(type_array->getNestedType(), rows);
-        auto offset_col = ColumnArray::ColumnOffsets::create(rows);
+        auto data_col = createColumn(type_array->getNestedType(), rows);
+        auto offset_col = ColumnArray::ColumnOffsets::create(rows, 0);
         auto & offsets = offset_col->getData();
         for (size_t i = 0; i < data_col->size(); ++i)
             offsets[i] = offsets[i - 1] + (rand() % 10);
@@ -80,10 +88,10 @@ static ColumnPtr createDataBlockImpl(const DataTypePtr & type, size_t rows)
     return std::move(column);
 }
 
-static Block createDataBlock(const String & type_str, size_t rows)
+static Block createBlock(const String & type_str, size_t rows)
 {
     auto type = DataTypeFactory::instance().get(type_str);
-    auto column = createDataBlockImpl(type, rows);
+    auto column = createColumn(type, rows);
 
     Block block;
     block.insert(ColumnWithTypeAndName(std::move(column), type, "d"));
@@ -95,7 +103,7 @@ static void BM_CHFloorFunction_For_Int64(benchmark::State & state)
     using namespace DB;
     auto & factory = FunctionFactory::instance();
     auto function = factory.get("floor", local_engine::SerializedPlanParser::global_context);
-    Block int64_block = createDataBlock("Nullable(Int64)", 65536);
+    Block int64_block = createBlock("Nullable(Int64)", 65536);
     auto executable = function->build(int64_block.getColumnsWithTypeAndName());
     for (auto _ : state)
     {
@@ -109,7 +117,7 @@ static void BM_CHFloorFunction_For_Float64(benchmark::State & state)
     using namespace DB;
     auto & factory = FunctionFactory::instance();
     auto function = factory.get("floor", local_engine::SerializedPlanParser::global_context);
-    Block float64_block = createDataBlock("Nullable(Float64)", 65536);
+    Block float64_block = createBlock("Nullable(Float64)", 65536);
     auto executable = function->build(float64_block.getColumnsWithTypeAndName());
     for (auto _ : state)
     {
@@ -123,7 +131,7 @@ static void BM_SparkFloorFunction_For_Int64(benchmark::State & state)
     using namespace DB;
     auto & factory = FunctionFactory::instance();
     auto function = factory.get("sparkFloor", local_engine::SerializedPlanParser::global_context);
-    Block int64_block = createDataBlock("Nullable(Int64)", 65536);
+    Block int64_block = createBlock("Nullable(Int64)", 65536);
     auto executable = function->build(int64_block.getColumnsWithTypeAndName());
     for (auto _ : state)
     {
@@ -137,7 +145,7 @@ static void BM_SparkFloorFunction_For_Float64(benchmark::State & state)
     using namespace DB;
     auto & factory = FunctionFactory::instance();
     auto function = factory.get("sparkFloor", local_engine::SerializedPlanParser::global_context);
-    Block float64_block = createDataBlock("Nullable(Float64)", 65536);
+    Block float64_block = createBlock("Nullable(Float64)", 65536);
     auto executable = function->build(float64_block.getColumnsWithTypeAndName());
     for (auto _ : state)
     {
@@ -804,7 +812,7 @@ template <const std::string & str_type>
 static void BM_insertManyFrom(benchmark::State & state)
 {
     auto type = DataTypeFactory::instance().get(str_type);
-    auto src = createDataBlockImpl(type, ROWS);
+    auto src = createColumn(type, ROWS);
 
     for (auto _ : state)
     {
@@ -841,3 +849,24 @@ BENCHMARK_TEMPLATE(BM_insertManyFrom, type_array_int64);
 BENCHMARK_TEMPLATE(BM_insertManyFrom, type_array_nullable_int64);
 BENCHMARK_TEMPLATE(BM_insertManyFrom, type_array_string);
 BENCHMARK_TEMPLATE(BM_insertManyFrom, type_array_nullable_string);
+
+/// Benchmark result: https://github.com/ClickHouse/ClickHouse/pull/60846
+
+
+
+template <const std::string & str_type>
+static void BM_replicate(benchmark::State & state)
+{
+    auto type = DataTypeFactory::instance().get(str_type);
+    auto col = createColumn(type, ROWS);
+    auto offsets = createOffsets(ROWS);
+    for (auto _ : state)
+    {
+        auto new_col = col->replicate(offsets);
+        benchmark::DoNotOptimize(new_col);
+    }
+}
+
+BENCHMARK_TEMPLATE(BM_replicate, type_string);
+BENCHMARK_TEMPLATE(BM_replicate, type_nullable_string);
+
