@@ -852,8 +852,6 @@ BENCHMARK_TEMPLATE(BM_insertManyFrom, type_array_nullable_string);
 
 /// Benchmark result: https://github.com/ClickHouse/ClickHouse/pull/60846
 
-
-
 template <const std::string & str_type>
 static void BM_replicate(benchmark::State & state)
 {
@@ -870,3 +868,87 @@ static void BM_replicate(benchmark::State & state)
 BENCHMARK_TEMPLATE(BM_replicate, type_string);
 BENCHMARK_TEMPLATE(BM_replicate, type_nullable_string);
 
+
+IColumn::Filter mockFilter(size_t rows)
+{
+    IColumn::Filter result(rows);
+    for (size_t i = 0; i < rows; ++i)
+        result[i] = rand() % 10 ? 0 : 1;
+    return std::move(result);
+}
+
+ColumnPtr mockIndexes(size_t rows)
+{
+    auto filter = mockFilter(rows);
+    auto result = ColumnUInt64::create();
+    auto & data = result->getData();
+    for (size_t i = 0; i < rows; ++i)
+    {
+        if (filter[i])
+            data.push_back(i);
+    }
+    return std::move(result);
+}
+
+template <const std::string & str_type>
+static void BM_filter(benchmark::State & state)
+{
+    auto type = DataTypeFactory::instance().get(str_type);
+    auto src = createColumn(type, ROWS);
+    auto filter = mockFilter(ROWS);
+    auto dst_size_hint = countBytesInFilter(filter);
+    for (auto _ : state)
+    {
+        auto dst = src->filter(filter, dst_size_hint);
+        benchmark::DoNotOptimize(dst);
+    }
+}
+
+template <const std::string & str_type>
+static void BM_index(benchmark::State & state)
+{
+    auto type = DataTypeFactory::instance().get(str_type);
+    auto src = createColumn(type, ROWS);
+    auto indexes = mockIndexes(ROWS);
+    for (auto _ : state)
+    {
+        auto dst = src->index(*indexes, 0);
+        benchmark::DoNotOptimize(dst);
+    }
+}
+
+
+template <const std::string & str_type>
+static void BM_filterInPlace(benchmark::State & state)
+{
+    auto type = DataTypeFactory::instance().get(str_type);
+    auto indexes_col = mockIndexes(ROWS);
+    const auto & indexes = assert_cast<const ColumnUInt64 &>(*indexes_col).getData();
+    for (auto _ : state)
+    {
+        state.PauseTiming();
+        auto src = createColumn(type, ROWS);
+        auto mutable_src = src->assumeMutable();
+        state.ResumeTiming();
+
+        mutable_src->filterInPlace(indexes, 0);
+        benchmark::DoNotOptimize(src);
+    }
+}
+
+
+BENCHMARK_TEMPLATE(BM_filter, type_int64);
+BENCHMARK_TEMPLATE(BM_index, type_int64);
+BENCHMARK_TEMPLATE(BM_filterInPlace, type_int64);
+
+BENCHMARK_TEMPLATE(BM_filter, type_nullable_int64);
+BENCHMARK_TEMPLATE(BM_index, type_nullable_int64);
+BENCHMARK_TEMPLATE(BM_filterInPlace, type_nullable_int64);
+
+BENCHMARK_TEMPLATE(BM_filter, type_string);
+BENCHMARK_TEMPLATE(BM_index, type_string);
+BENCHMARK_TEMPLATE(BM_filterInPlace, type_string);
+
+BENCHMARK_TEMPLATE(BM_filter, type_nullable_string);
+BENCHMARK_TEMPLATE(BM_index, type_nullable_string);
+BENCHMARK_TEMPLATE(BM_filterInPlace, type_nullable_string);
