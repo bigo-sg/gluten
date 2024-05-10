@@ -87,13 +87,7 @@ case class JoinSelectionOverrides(session: SparkSession)
       }
 
       if (
-        forceShuffledHashJoin &&
-        !BackendsApiManager.getSparkPlanExecApiInstance.joinFallback(
-          joinType,
-          left.outputSet,
-          right.outputSet,
-          condition) &&
-        !left.getTagValue(TAG).isDefined &&
+        forceShuffledHashJoin && !left.getTagValue(TAG).isDefined &&
         !right.getTagValue(TAG).isDefined
       ) {
         // Force use of ShuffledHashJoin in preference to SortMergeJoin. With no respect to

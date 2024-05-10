@@ -31,6 +31,9 @@
 #include <Processors/QueryPlan/JoinStep.h>
 #include <google/protobuf/wrappers.pb.h>
 
+#include <Poco/Logger.h>
+#include <Common/logger_useful.h>
+
 namespace DB
 {
 namespace ErrorCodes
@@ -239,8 +242,6 @@ DB::QueryPlanPtr JoinRelParser::parseJoin(const substrait::JoinRel & join, DB::Q
     }
     else
     {
-        /// TODO: make grace hash join be the default hash join algorithm.
-        ///
         /// Following is some configuration for grace hash join.
         /// - spark.gluten.sql.columnar.backend.ch.runtime_settings.join_algorithm=grace_hash. This will
         ///   enable grace hash join.
@@ -387,6 +388,7 @@ bool JoinRelParser::tryAddPushDownFilter(
     const NamesAndTypesList & alias_right,
     const Names & names)
 {
+    LOG_ERROR(&Poco::Logger::get("JoinRelParser"), "xxx join rel:\n{}", join.DebugString());
     try
     {
         ASTParser astParser(context, function_mapping, getPlanParser());
@@ -397,6 +399,7 @@ bool JoinRelParser::tryAddPushDownFilter(
             args.emplace_back(astParser.parseToAST(names, join.expression()));
         }
 
+        /// e.g. on t1.key = t2.key and t1.value > 1, 't1.value > 1' is the post filter.
         if (join.has_post_join_filter())
         {
             args.emplace_back(astParser.parseToAST(names, join.post_join_filter()));

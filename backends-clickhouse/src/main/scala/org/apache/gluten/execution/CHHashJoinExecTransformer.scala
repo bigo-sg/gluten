@@ -52,11 +52,6 @@ case class CHShuffledHashJoinExecTransformer(
     copy(left = newLeft, right = newRight)
 
   override protected def doValidateInternal(): ValidationResult = {
-    val shouldFallback =
-      CHJoinValidateUtil.shouldFallback(joinType, left.outputSet, right.outputSet, condition)
-    if (shouldFallback) {
-      return ValidationResult.notOk("ch join validate fail")
-    }
     super.doValidateInternal()
   }
 }
