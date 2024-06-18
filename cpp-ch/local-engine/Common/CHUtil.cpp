@@ -1024,7 +1024,10 @@ void BackendInitializerUtil::updateConfig(const DB::ContextMutablePtr & context,
 
 void BackendFinalizerUtil::finalizeGlobally()
 {
-    // Make sure client caches release before ClientCacheRegistry
+    /// Make sure that all active LocalExecutor stop before spark executor shutdown, otherwise crash map happen.
+    LocalExecutor::cancelAll();
+
+    /// Make sure client caches release before ClientCacheRegistry
     ReadBufferBuilderFactory::instance().clean();
     StorageMergeTreeFactory::clear();
     auto & global_context = SerializedPlanParser::global_context;
