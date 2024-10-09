@@ -893,9 +893,9 @@ BENCHMARK(BM_ParquetRead)->Unit(benchmark::kMillisecond)->Iterations(10);
 
 int main(int argc, char ** argv)
 {
-    std::string empty;
-    // BackendInitializerUtil::init(empty);
-    //SCOPE_EXIT({ BackendFinalizerUtil::finalizeGlobally(); });
+    std::map<std::string, std::string> empty;
+    BackendInitializerUtil::initBackend(empty);
+    SCOPE_EXIT({ BackendFinalizerUtil::finalizeGlobally(); });
 
     ::benchmark::Initialize(&argc, argv);
     if (::benchmark::ReportUnrecognizedArguments(argc, argv))

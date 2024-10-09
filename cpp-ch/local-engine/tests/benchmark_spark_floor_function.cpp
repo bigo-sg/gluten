@@ -103,7 +103,7 @@ static void BM_CHFloorFunction_For_Int64(benchmark::State & state)
 {
     using namespace DB;
     auto & factory = FunctionFactory::instance();
-    auto function = factory.get("floor", local_engine::SerializedPlanParser::global_context);
+    auto function = factory.get("floor", local_engine::QueryContext::globalContext());
     Block int64_block = createBlock("Nullable(Int64)", 65536);
     auto executable = function->build(int64_block.getColumnsWithTypeAndName());
     for (auto _ : state)
@@ -117,7 +117,7 @@ static void BM_CHFloorFunction_For_Float64(benchmark::State & state)
 {
     using namespace DB;
     auto & factory = FunctionFactory::instance();
-    auto function = factory.get("floor", local_engine::SerializedPlanParser::global_context);
+    auto function = factory.get("floor", local_engine::QueryContext::globalContext());
     Block float64_block = createBlock("Nullable(Float64)", 65536);
     auto executable = function->build(float64_block.getColumnsWithTypeAndName());
     for (auto _ : state)
@@ -131,7 +131,7 @@ static void BM_SparkFloorFunction_For_Int64(benchmark::State & state)
 {
     using namespace DB;
     auto & factory = FunctionFactory::instance();
-    auto function = factory.get("sparkFloor", local_engine::SerializedPlanParser::global_context);
+    auto function = factory.get("sparkFloor", local_engine::QueryContext::globalContext());
     Block int64_block = createBlock("Nullable(Int64)", 65536);
     auto executable = function->build(int64_block.getColumnsWithTypeAndName());
     for (auto _ : state)
@@ -145,7 +145,7 @@ static void BM_SparkFloorFunction_For_Float64(benchmark::State & state)
 {
     using namespace DB;
     auto & factory = FunctionFactory::instance();
-    auto function = factory.get("sparkFloor", local_engine::SerializedPlanParser::global_context);
+    auto function = factory.get("sparkFloor", local_engine::QueryContext::globalContext());
     Block float64_block = createBlock("Nullable(Float64)", 65536);
     auto executable = function->build(float64_block.getColumnsWithTypeAndName());
     for (auto _ : state)
@@ -919,6 +919,7 @@ static void BM_index(benchmark::State & state)
 }
 
 
+/*
 template <const std::string & str_type>
 static void BM_filterInPlace(benchmark::State & state)
 {
@@ -936,6 +937,7 @@ static void BM_filterInPlace(benchmark::State & state)
         benchmark::DoNotOptimize(src);
     }
 }
+*/
 
 
 /*
@@ -978,19 +980,19 @@ BM_filterInPlace<type_nullable_string>     271534 ns       271424 ns
 
 BENCHMARK_TEMPLATE(BM_filter, type_int64);
 BENCHMARK_TEMPLATE(BM_index, type_int64);
-BENCHMARK_TEMPLATE(BM_filterInPlace, type_int64);
+// BENCHMARK_TEMPLATE(BM_filterInPlace, type_int64);
 
 BENCHMARK_TEMPLATE(BM_filter, type_nullable_int64);
 BENCHMARK_TEMPLATE(BM_index, type_nullable_int64);
-BENCHMARK_TEMPLATE(BM_filterInPlace, type_nullable_int64);
+// BENCHMARK_TEMPLATE(BM_filterInPlace, type_nullable_int64);
 
 BENCHMARK_TEMPLATE(BM_filter, type_string);
 BENCHMARK_TEMPLATE(BM_index, type_string);
-BENCHMARK_TEMPLATE(BM_filterInPlace, type_string);
+// BENCHMARK_TEMPLATE(BM_filterInPlace, type_string);
 
 BENCHMARK_TEMPLATE(BM_filter, type_nullable_string);
 BENCHMARK_TEMPLATE(BM_index, type_nullable_string);
-BENCHMARK_TEMPLATE(BM_filterInPlace, type_nullable_string);
+// BENCHMARK_TEMPLATE(BM_filterInPlace, type_nullable_string);
 
 
 
