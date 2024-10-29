@@ -21,6 +21,7 @@
 #include <IO/SeekableReadBuffer.h>
 #include <IO/VarInt.h>
 #include <base/find_symbols.h>
+#include <Common/logger_useful.h>
 
 
 namespace DB
@@ -188,6 +189,12 @@ SplittableBzip2ReadBuffer::SplittableBzip2ReadBuffer(
         adjusted_start = seekable->getPosition();
     }
     changeStateToProcessABlock();
+    LOG_DEBUG(
+        getLogger("SplittableBzip2ReadBuffer"),
+        "adjusted_start: {} first_block_need_special_process: {} last_block_need_special_process: {}",
+        *adjusted_start,
+        first_block_need_special_process,
+        last_block_need_special_process);
 }
 
 Int32 SplittableBzip2ReadBuffer::read(char * dest, size_t dest_size, size_t offs, size_t len)
@@ -215,44 +222,79 @@ Int32 SplittableBzip2ReadBuffer::read(char * dest, size_t dest_size, size_t offs
 
 bool SplittableBzip2ReadBuffer::nextImpl()
 {
-    Position dest = internal_buffer.begin();
-    size_t dest_size = internal_buffer.size();
+    const Position dest = internal_buffer.begin();
+    const size_t dest_size = internal_buffer.size();
     size_t offset = 0;
+
+    if (last_block_need_special_process && !last_incomplete_line.empty())
+    {
+        /// If we have last incomplete line, append it to the beginning of internal buffer
+        memmove(dest, last_incomplete_line.data, last_incomplete_line.size);
+        offset += last_incomplete_line.size;
+        last_incomplete_line = {nullptr, 0};
+    }
+
     Int32 result;
     do
     {
         result = read(dest, dest_size, offset, dest_size - offset);
         if (result > 0)
             offset += result;
-        else if (result == BZip2Constants::END_OF_BLOCK && is_first_block && first_block_need_special_process)
+        else if (result == BZip2Constants::END_OF_BLOCK)
         {
-            /// Special processing for the first block
-            /// Notice that row delim could be \n (Unix) or \r\n (DOS/Windows) or \n\r (Mac OS Classic)
-            is_first_block = false;
-            Position end = dest + offset;
-            auto * pos = find_last_symbols_or_null<'\n'>(dest, end);
-            if (pos)
+            if (is_first_block && first_block_need_special_process)
             {
-                if (pos == end - 1 || (pos == end - 2 && *(pos + 1) == '\r'))
+                /// Special processing for the first block
+                /// Notice that row delim could be \n (Unix) or \r\n (DOS/Windows) or \n\r (Mac OS Classic)
+                is_first_block = false;
+                Position end = dest + offset;
+                auto * pos = find_last_symbols_or_null<'\n'>(dest, end);
+                if (pos)
                 {
-                    /// The last row ends with \n or \r\n or \n\r, discard all lines in internal buffer
-                    offset = 0;
+                    if (pos == end - 1 || (pos == end - 2 && *(pos + 1) == '\r'))
+                    {
+                        /// The last row ends with \n or \r\n or \n\r, discard all lines in internal buffer
+                        offset = 0;
+                    }
+                    else
+                    {
+                        /// The last row does not end with \n or \r\n or \n\r, rewrite the last row to internal buffer
+                        Position last_line = pos + 1;
+                        size_t last_line_size = end - pos - 1;
+                        if (*(pos + 1) == '\r')
+                            last_line_size--;
+
+                        memmove(dest, last_line, last_line_size);
+                        offset = last_line_size;
+                    }
                 }
+                LOG_DEBUG(
+                    getLogger("SplittableBzip2ReadBuffer"),
+                    "Header of first block after special processed:{}",
+                    std::string(dest, std::min(offset, 100UL)));
+            }
+            else if (last_block_need_special_process && (!is_first_block || !first_block_need_special_process))
+            {
+                /// If we met the first block which is not specially processed. Record the last incomplete line.
+                Position end = dest + offset;
+                auto * pos = find_last_symbols_or_null<'\n'>(dest, end);
+                if (!pos)
+                    throw Exception(ErrorCodes::LOGICAL_ERROR, "Can't find row delimiter in current block");
                 else
                 {
-                    /// The last row does not end with \n or \r\n or \n\r, rewrite the last row to internal buffer
-                    Position last_line = pos + 1;
-                    size_t last_line_size = end - pos - 1;
-                    if (*(pos + 1) == '\r')
-                        last_line_size--;
+                    size_t old_offset = offset;
+                    offset = pos - dest + 1;
+                    if (pos + 1 < end && *(pos + 1) == '\r')
+                        offset++;
 
-                    memmove(dest, last_line, last_line_size);
-                    offset = last_line_size;
+                    last_incomplete_line = {&dest[offset], old_offset - offset};
                 }
             }
         }
         else if (result == BZip2Constants::END_OF_STREAM && last_block_need_special_process)
         {
+            LOG_DEBUG(getLogger("SplittableBzip2ReadBuffer"), "Header of last block before special processed:{}", std::string(dest, std::min(offset, 100UL)));
+
             /// Special processing for the last block
             Position end = dest + offset;
             auto * pos = find_last_symbols_or_null<'\n'>(dest, end);
