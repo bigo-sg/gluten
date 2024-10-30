@@ -218,7 +218,7 @@ Int32 SplittableBzip2ReadBuffer::read(char * dest, size_t dest_size, size_t offs
         skipResult = skipToNextMarker(SplittableBzip2ReadBuffer::BLOCK_DELIMITER, DELIMITER_BIT_LENGTH);
 
         auto * seekable = dynamic_cast<SeekableReadBuffer*>(in.get());
-        std::cout << "skipResult:" << skipResult << " position:" << seekable->getPosition() << " b:" << b << std::endl;
+        // std::cout << "skipResult:" << skipResult << " position:" << seekable->getPosition() << " b:" << b << std::endl;
         changeStateToProcessABlock();
     }
     return result;
