@@ -208,7 +208,7 @@ private:
 
     /// Record the last incomplete line in the latest `nextImpl`
     /// It is excluded from the output of latest `nextImpl` because we are not sure if it is completed in the lifetime of the current split until next `nextImpl`.
-    StringRef last_incomplete_line;
+    String last_incomplete_line;
 
 
     Int32 blockSize100k;

@@ -26,27 +26,35 @@
 #include <Storages/ObjectStorage/HDFS/ReadBufferFromHDFS.h>
 #include <Poco/Util/MapConfiguration.h>
 #include <Common/Config/ConfigProcessor.h>
+#include <Common/LoggerExtend.h>
 
 using namespace DB;
 
 int main()
 {
-    setenv("LIBHDFS3_CONF", "/path/to/hdfs/config", true); /// NOLINT
-    String hdfs_uri = "hdfs://cluster";
-    String hdfs_file_path = "/path/to/bzip2/file";
+    local_engine::LoggerExtend::initConsoleLogger("debug");
+
+    // setenv("LIBHDFS3_CONF", "/path/to/hdfs/config", true); /// NOLINT
+    // String hdfs_uri = "hdfs://cluster";
+    // String hdfs_file_path = "/path/to/bzip2/file";
+    setenv("LIBHDFS3_CONF", "/data1/clickhouse_official/conf/hdfs-site.bigocluster.xml", true); /// NOLINT
+    String hdfs_uri = "hdfs://bigocluster";
+    String hdfs_file_path = "/data/apps/imo_us/imo_data_logs_etl/data/imo_data_logs/Room.leave_room_event/day=2024-10-09/part-00000.bz2";
     ConfigurationPtr config = Poco::AutoPtr(new Poco::Util::MapConfiguration());
     ReadSettings read_settings;
     std::unique_ptr<SeekableReadBuffer> in = std::make_unique<ReadBufferFromHDFS>(hdfs_uri, hdfs_file_path, *config, read_settings, 0, true);
 
     std::unique_ptr<SeekableReadBuffer> bounded_in = std::make_unique<BoundedReadBuffer>(std::move(in));
-    size_t start = 805306368;
-    size_t end = 1073900813;
+    // size_t start = 805306368;
+    // size_t end = 1073900813;
+    size_t start = 0;
+    size_t end = 268576809;
     bounded_in->seek(start, SEEK_SET);
     bounded_in->setReadUntilPosition(end);
 
-    std::unique_ptr<ReadBuffer> decompressed = std::make_unique<SplittableBzip2ReadBuffer>(std::move(bounded_in), true, true);
+    std::unique_ptr<ReadBuffer> decompressed = std::make_unique<SplittableBzip2ReadBuffer>(std::move(bounded_in), false, false);
 
-    String download_path = "./download.txt";
+    String download_path = "./download_" + std::to_string(start) + "_" + std::to_string(end) + ".txt";
     WriteBufferFromFile write_buffer(download_path);
     copyData(*decompressed, write_buffer);
     return 0;
