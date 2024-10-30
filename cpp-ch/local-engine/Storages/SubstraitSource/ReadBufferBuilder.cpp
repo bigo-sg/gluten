@@ -733,10 +733,11 @@ ReadBufferBuilder::wrapWithBzip2(std::unique_ptr<DB::ReadBuffer> in, const subst
 
     bounded_in->seek(new_start, SEEK_SET);
     bounded_in->setReadUntilPosition(new_end);
-    bool first_block_need_special_process = (new_start > 0);
-    bool last_block_need_special_process = (new_end < file_size);
-    auto decompressed_in = std::make_unique<SplittableBzip2ReadBuffer>(
-        std::move(bounded_in), first_block_need_special_process, last_block_need_special_process);
+    // bool first_block_need_special_process = (new_start > 0);
+    // bool last_block_need_special_process = (new_end < file_size);
+    // auto decompressed_in = std::make_unique<SplittableBzip2ReadBuffer>(
+        // std::move(bounded_in), first_block_need_special_process, last_block_need_special_process);
+    auto decompressed_in = std::make_unique<SplittableBzip2ReadBuffer>(std::move(bounded_in));
     return std::move(decompressed_in);
 }
 

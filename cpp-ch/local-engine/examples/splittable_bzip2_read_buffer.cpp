@@ -47,12 +47,17 @@ int main()
     std::unique_ptr<SeekableReadBuffer> bounded_in = std::make_unique<BoundedReadBuffer>(std::move(in));
     // size_t start = 805306368;
     // size_t end = 1073900813;
+    // size_t start = 268534834 - 1000;
+    // size_t end = 268576809;
+    // size_t start = 268576809;
+    // size_t end = 270673961;
     size_t start = 0;
-    size_t end = 268576809;
+    size_t end = 1395344291;
     bounded_in->seek(start, SEEK_SET);
     bounded_in->setReadUntilPosition(end);
 
-    std::unique_ptr<ReadBuffer> decompressed = std::make_unique<SplittableBzip2ReadBuffer>(std::move(bounded_in), false, false);
+    // std::unique_ptr<ReadBuffer> decompressed = std::make_unique<SplittableBzip2ReadBuffer>(std::move(bounded_in), false, false);
+    std::unique_ptr<ReadBuffer> decompressed = std::make_unique<SplittableBzip2ReadBuffer>(std::move(bounded_in));
 
     String download_path = "./download_" + std::to_string(start) + "_" + std::to_string(end) + ".txt";
     WriteBufferFromFile write_buffer(download_path);

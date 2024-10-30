@@ -1,29 +1,8 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 #include "SplittableBzip2ReadBuffer.h"
 
 #if USE_BZIP2
 #include <IO/SeekableReadBuffer.h>
 #include <IO/VarInt.h>
-#include <base/find_symbols.h>
-#include <Common/logger_useful.h>
-#include <iostream>
-
 
 namespace DB
 {
@@ -156,16 +135,8 @@ void SplittableBzip2ReadBuffer::hbCreateDecodeTables(
 }
 
 SplittableBzip2ReadBuffer::SplittableBzip2ReadBuffer(
-    std::unique_ptr<ReadBuffer> in_,
-    bool first_block_need_special_process_,
-    bool last_block_need_special_process_,
-    size_t buf_size,
-    char * existing_memory,
-    size_t alignment)
+    std::unique_ptr<ReadBuffer> in_, size_t buf_size, char * existing_memory, size_t alignment)
     : CompressedReadBufferWrapper(std::move(in_), buf_size, existing_memory, alignment)
-    , first_block_need_special_process(first_block_need_special_process_)
-    , last_block_need_special_process(last_block_need_special_process_)
-    , is_first_block(true)
     , blockSize100k(9)
     , currentState(STATE::NO_PROCESS_STATE)
     , skipResult(false)
@@ -184,18 +155,13 @@ SplittableBzip2ReadBuffer::SplittableBzip2ReadBuffer(
 {
     auto * seekable = dynamic_cast<SeekableReadBuffer*>(in.get());
     skipResult = skipToNextMarker(BLOCK_DELIMITER, DELIMITER_BIT_LENGTH);
+    /// Update adjusted_start
     if (seekable && skipResult)
     {
-        /// Update adjusted_start
         adjusted_start = seekable->getPosition();
+        std::cout << "adjusted_start: " << *adjusted_start << std::endl;
     }
     changeStateToProcessABlock();
-    LOG_DEBUG(
-        getLogger("SplittableBzip2ReadBuffer"),
-        "adjusted_start: {} first_block_need_special_process: {} last_block_need_special_process: {}",
-        *adjusted_start,
-        first_block_need_special_process,
-        last_block_need_special_process);
 }
 
 Int32 SplittableBzip2ReadBuffer::read(char * dest, size_t dest_size, size_t offs, size_t len)
@@ -216,9 +182,6 @@ Int32 SplittableBzip2ReadBuffer::read(char * dest, size_t dest_size, size_t offs
     {
         result = b;
         skipResult = skipToNextMarker(SplittableBzip2ReadBuffer::BLOCK_DELIMITER, DELIMITER_BIT_LENGTH);
-
-        auto * seekable = dynamic_cast<SeekableReadBuffer*>(in.get());
-        // std::cout << "skipResult:" << skipResult << " position:" << seekable->getPosition() << " b:" << b << std::endl;
         changeStateToProcessABlock();
     }
     return result;
@@ -226,90 +189,21 @@ Int32 SplittableBzip2ReadBuffer::read(char * dest, size_t dest_size, size_t offs
 
 bool SplittableBzip2ReadBuffer::nextImpl()
 {
-    const Position dest = internal_buffer.begin();
-    const size_t dest_size = internal_buffer.size();
+    Position dest = internal_buffer.begin();
+    size_t dest_size = internal_buffer.size();
     size_t offset = 0;
-
-    if (last_block_need_special_process && !last_incomplete_line.empty())
-    {
-        /// If we have last incomplete line, append it to the beginning of internal buffer
-        memcpy(dest, last_incomplete_line.data(), last_incomplete_line.size());
-        offset += last_incomplete_line.size();
-        last_incomplete_line.clear();
-    }
-
     Int32 result;
     do
     {
         result = read(dest, dest_size, offset, dest_size - offset);
         if (result > 0)
             offset += result;
-        else if (first_block_need_special_process && result == BZip2Constants::END_OF_BLOCK && is_first_block)
+        else if (result != BZip2Constants::END_OF_STREAM)
         {
-            /// Special processing for the first block
-            /// Notice that row delim could be \n (Unix) or \r\n (DOS/Windows) or \n\r (Mac OS Classic)
-            is_first_block = false;
-            Position end = dest + offset;
-            auto * pos = find_last_symbols_or_null<'\n'>(dest, end);
-            if (pos)
-            {
-                if (pos == end - 1 || (pos == end - 2 && *(pos + 1) == '\r'))
-                {
-                    /// The last row ends with \n or \r\n or \n\r, discard all lines in internal buffer
-                    offset = 0;
-                }
-                else
-                {
-                    /// The last row does not end with \n or \r\n or \n\r, rewrite the last row to internal buffer
-                    Position last_line = pos + 1;
-                    size_t last_line_size = end - pos - 1;
-                    if (*(pos + 1) == '\r')
-                        last_line_size--;
-
-                    memmove(dest, last_line, last_line_size);
-                    offset = last_line_size;
-                }
-            }
-            LOG_DEBUG(
-                getLogger("SplittableBzip2ReadBuffer"),
-                "Header of first block after special processed:{}",
-                std::string(dest, std::min(offset, 100UL)));
+            auto * seekable = dynamic_cast<SeekableReadBuffer*>(in.get());
+            std::cout << "end of block:" << seekable->getPosition() << std::endl;
         }
     } while (result != BZip2Constants::END_OF_STREAM && offset < dest_size);
-
-    if (last_block_need_special_process && offset)
-    {
-        /// Trim the last incomplete line from [dest, dest+offset), and record it in last_incomplete_line
-        bool reach_last_block = (result == BZip2Constants::END_OF_STREAM);
-        if (reach_last_block)
-        {
-            LOG_DEBUG(
-                getLogger("SplittableBzip2ReadBuffer"),
-                "Header of last block before special processed:{}",
-                std::string(dest, std::min(offset, 100UL)));
-        }
-
-        /// Trim the last incomplete line from [dest, dest+offset), and record it in last_incomplete_line
-        Position end = dest + offset;
-        auto * pos = find_last_symbols_or_null<'\n'>(dest, end);
-        if (!pos)
-        {
-            if (reach_last_block)
-                offset = 0;
-            else
-                throw Exception(ErrorCodes::LOGICAL_ERROR, "Can't find row delimiter in working buffer with size:{}", offset);
-        }
-        else
-        {
-            /// Discard the last incomplete row(if has), and record it in last_incomplete_line
-            size_t old_offset = offset;
-            offset = pos - dest + 1;
-            if (pos + 1 < end && *(pos + 1) == '\r')
-                offset++;
-
-            last_incomplete_line.assign(&dest[offset], old_offset - offset);
-        }
-    }
 
     if (offset)
     {
@@ -317,7 +211,9 @@ bool SplittableBzip2ReadBuffer::nextImpl()
         return true;
     }
     else
+    {
         return false;
+    }
 }
 
 Int32 SplittableBzip2ReadBuffer::read0()

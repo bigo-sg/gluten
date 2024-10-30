@@ -1,28 +1,11 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 #pragma once
 
 #include "config.h"
 
 #if USE_BZIP2
+#include <iostream>
 #include <vector>
 #include <IO/CompressedReadBufferWrapper.h>
-#include <base/StringRef.h>
 
 namespace DB
 {
@@ -186,30 +169,6 @@ private:
         NO_PROCESS_STATE
     };
 
-    /// If current bzip2 file split is not the fist one, then start_need_special_process should be true.
-    /// When it is true, the decompressed result of the first block will be ignored except the last line.
-    /// Case1:
-    /// e.g. "line1 \n line2 \n line3", line1 and line2 will be ignored because they are processed in the previous split.
-    /// We are not sure if line3 is a completed line, so line3 will be concated before the decompressed result of the next block in current split.
-    /// Case2:
-    /// e.g. "line2 \n line2 \n line3 \n", all lines will be ignored because they are processed in the previous split.
-    const bool first_block_need_special_process;
-
-    /// If current bzip2 file split is not the last one, then end_need_special_process should be true.
-    /// When it is true, the decompressed result of the last block will be processed except the last line.
-    /// Case1:
-    /// e.g. "line1 \n line2 \n line3", line3 will be ignored because it is processed in the next split.
-    /// Case2:
-    /// e.g. "line1 \n line2 \n line3 \n", all lines will be processed because we are pretty sure that line3 is a completed line.
-    const bool last_block_need_special_process;
-
-    /// Whether the compressed block is the first one. It is used to apply special process for the first block.
-    bool is_first_block;
-
-    /// Record the last incomplete line in the latest `nextImpl`
-    /// It is excluded from the output of latest `nextImpl` because we are not sure if it is completed in the lifetime of the current split until next `nextImpl`.
-    String last_incomplete_line;
-
 
     Int32 blockSize100k;
     STATE currentState;
@@ -255,8 +214,6 @@ private:
 public:
     explicit SplittableBzip2ReadBuffer(
         std::unique_ptr<ReadBuffer> in_,
-        bool first_block_need_special_process_ = false,
-        bool last_block_need_special_process_ = false,
         size_t buf_size = DBMS_DEFAULT_BUFFER_SIZE,
         char * existing_memory = nullptr,
         size_t alignment = 0);
