@@ -566,11 +566,11 @@ struct NameSparkDecimalDivideEffect
 };
 struct NameSparkDecimalModulo
 {
-    static constexpr auto name = "NameSparkDecimalModulo";
+    static constexpr auto name = "sparkDecimalModulo";
 };
 struct NameSparkDecimalModuloEffect
 {
-    static constexpr auto name = "NameSparkDecimalModuloEffect";
+    static constexpr auto name = "sparkDecimalModuloEffect";
 };
 
 
