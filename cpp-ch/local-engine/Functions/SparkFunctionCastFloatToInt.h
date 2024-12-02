@@ -41,6 +41,7 @@ namespace ErrorCodes
 namespace local_engine
 {
 
+/// TODO(taiyang-li): remove int_max_value and int_min_value for it is determined by T
 template <typename T, typename Name, T int_max_value, T int_min_value>
 class SparkFunctionCastFloatToInt : public IFunction
 {
@@ -99,6 +100,7 @@ public:
     void executeInternal(const ColumnPtr & src, PaddedPODArray<T> & data, PaddedPODArray<UInt8> & null_map_data) const
     {
         const ColumnVector<F> * src_vec = assert_cast<const ColumnVector<F> *>(src.get());
+        /// TODO(taiyang-li): try to vectorize below loop
         for (size_t i = 0; i < src_vec->size(); ++i)
         {
             F element = src_vec->getElement(i);
