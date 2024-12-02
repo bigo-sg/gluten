@@ -434,6 +434,7 @@ private:
 };
 
 
+/// TODO(taiyang-li): implement JIT for binary deicmal arithmetic functions
 template <class Operation, typename Name, OpMode Mode = OpMode::Default>
 class SparkFunctionDecimalBinaryArithmetic final : public IFunction
 {
