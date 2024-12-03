@@ -46,24 +46,24 @@ template <typename T, typename Name, T int_max_value, T int_min_value>
 class SparkFunctionCastFloatToInt : public IFunction
 {
 public:
-    size_t getNumberOfArguments() const override { return 1; }
+    static_assert(std::is_integral_v<T>, "Template parameter T must be an integral type");
     static constexpr auto name = Name::name;
     static FunctionPtr create(ContextPtr) { return std::make_shared<SparkFunctionCastFloatToInt>(); }
+
     SparkFunctionCastFloatToInt() = default;
     ~SparkFunctionCastFloatToInt() override = default;
+
     String getName() const override { return name; }
+    size_t getNumberOfArguments() const override { return 1; }
     bool useDefaultImplementationForConstants() const override { return true; }
     bool isSuitableForShortCircuitArgumentsExecution(const DataTypesWithConstInfo & /*arguments*/) const override { return true; }
 
     DataTypePtr getReturnTypeImpl(const DataTypes & arguments) const override
     {
-        if (arguments.size() == 1)
+        if (arguments.size() != 1)
             throw Exception(ErrorCodes::NUMBER_OF_ARGUMENTS_DOESNT_MATCH, "Function {}'s arguments number must be 1", name);
 
-        if constexpr (std::is_integral_v<T>)
-            return makeNullable(std::make_shared<const DataTypeNumber<T>>());
-        else
-            throw Exception(ErrorCodes::TYPE_MISMATCH, "Function {}'s return type should be Int", name);
+        return makeNullable(std::make_shared<const DataTypeNumber<T>>());
     }
 
     ColumnPtr executeImpl(const ColumnsWithTypeAndName & arguments, const DataTypePtr & result_type, size_t) const override
