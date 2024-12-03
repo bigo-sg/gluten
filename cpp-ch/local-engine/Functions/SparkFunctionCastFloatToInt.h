@@ -42,11 +42,10 @@ namespace local_engine
 {
 
 /// TODO(taiyang-li): remove int_max_value and int_min_value for it is determined by T
-template <typename T, typename Name, T int_max_value, T int_min_value>
+template <is_integer T, typename Name, T int_max_value, T int_min_value>
 class SparkFunctionCastFloatToInt : public IFunction
 {
 public:
-    static_assert(std::is_integral_v<T>, "Template parameter T must be an integral type");
     static constexpr auto name = Name::name;
     static FunctionPtr create(ContextPtr) { return std::make_shared<SparkFunctionCastFloatToInt>(); }
 
