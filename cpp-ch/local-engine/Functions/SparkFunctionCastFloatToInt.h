@@ -132,7 +132,7 @@ public:
         auto & b = static_cast<llvm::IRBuilder<> &>(builder);
         llvm::Value * src_value = arguments[0].value;
 
-        llvm::Type * int_type = llvm::Type::getIntNTy(b.getContext(), sizeof(T) * 8);
+        auto * int_type = toNativeType(b, removeNullable(result_type));
         llvm::Type * float_type = src_value->getType();
 
         llvm::Value * is_nan = b.CreateFCmpUNO(src_value, src_value);
