@@ -62,12 +62,12 @@ enum class OpMode : uint8_t
 };
 
 template <bool is_plus_minus, bool is_multiply, bool is_division, bool is_modulo>
-bool calculateWith256(const IDataType & left, const IDataType & right)
+bool shouldCalculateWith256(const IDataType & left, const IDataType & right)
 {
-    const size_t p1 = getDecimalPrecision(left);
-    const size_t s1 = getDecimalScale(left);
-    const size_t p2 = getDecimalPrecision(right);
-    const size_t s2 = getDecimalScale(right);
+    size_t p1 = getDecimalPrecision(left);
+    size_t s1 = getDecimalScale(left);
+    size_t p2 = getDecimalPrecision(right);
+    size_t s2 = getDecimalScale(right);
 
     size_t precision;
     if constexpr (is_plus_minus)
@@ -94,12 +94,16 @@ private:
     static constexpr bool is_modulo = SparkIsOperation<Operation>::modulo;
 
 public:
-    template <typename A, typename B, typename R>
-    static ColumnPtr executeDecimal(const ColumnsWithTypeAndName & arguments, const A & left, const B & right, const R & result)
+    template <typename LeftDataType, typename RightDataType, typename ResultDataType>
+    static ColumnPtr executeDecimal(
+        const ColumnsWithTypeAndName & arguments,
+        const LeftDataType & left_type,
+        const LeftDataType & right_type,
+        const ResultDataType & result_type)
     {
-        using LeftDataType = std::decay_t<decltype(left)>; // e.g. DataTypeDecimal<Decimal32>
-        using RightDataType = std::decay_t<decltype(right)>; // e.g. DataTypeDecimal<Decimal32>
-        using ResultDataType = std::decay_t<decltype(result)>; // e.g. DataTypeDecimal<Decimal32>
+        // using LeftDataType = std::decay_t<decltype(left_type)>; // e.g. DataTypeDecimal<Decimal32>
+        // using RightDataType = std::decay_t<decltype(right_type)>; // e.g. DataTypeDecimal<Decimal32>
+        // using ResultDataType = std::decay_t<decltype(result_type)>; // e.g. DataTypeDecimal<Decimal32>
         using ColVecLeft = ColumnVectorOrDecimal<typename LeftDataType::FieldType>;
         using ColVecRight = ColumnVectorOrDecimal<typename RightDataType::FieldType>;
 
@@ -111,312 +115,353 @@ public:
         const ColVecLeft * col_left_vec = checkAndGetColumn<ColVecLeft>(col_left.get());
         const ColVecRight * col_right_vec = checkAndGetColumn<ColVecRight>(col_right.get());
 
-        const size_t col_left_size = col_left->size();
+        size_t rows = col_left->size();
         if constexpr (Mode == OpMode::Effect)
         {
             return executeDecimalImpl<LeftDataType, RightDataType, ResultDataType, NativeType<typename ResultDataType::FieldType>>(
-                left, right, col_left_const, col_right_const, col_left_vec, col_right_vec, col_left_size, result);
+                left_type, right_type, col_left_const, col_right_const, col_left_vec, col_right_vec, rows, result_type);
         }
 
-        if (calculateWith256<is_plus_minus, is_multiply, is_division, is_modulo>(*arguments[0].type.get(), *arguments[1].type.get()))
+        if (shouldCalculateWith256<is_plus_minus, is_multiply, is_division, is_modulo>(*arguments[0].type, *arguments[1].type))
         {
             return executeDecimalImpl<LeftDataType, RightDataType, ResultDataType, Int256, true>(
-                left, right, col_left_const, col_right_const, col_left_vec, col_right_vec, col_left_size, result);
+                left_type, right_type, col_left_const, col_right_const, col_left_vec, col_right_vec, rows, result_type);
         }
 
-        size_t max_scale = getMaxScaled(left.getScale(), right.getScale(), result.getScale());
-        if (is_division && max_scale - left.getScale() + max_scale > DataTypeDecimal<typename ResultDataType::FieldType>::maxPrecision())
+        size_t max_scale = getMaxScaled(left_type.getScale(), right_type.getScale(), result_type.getScale());
+        if (is_division && max_scale - left_type.getScale() + max_scale > DataTypeDecimal<typename ResultDataType::FieldType>::maxPrecision())
         {
             return executeDecimalImpl<LeftDataType, RightDataType, ResultDataType, Int256, true>(
-                left, right, col_left_const, col_right_const, col_left_vec, col_right_vec, col_left_size, result);
+                left_type, right_type, col_left_const, col_right_const, col_left_vec, col_right_vec, rows, result_type);
         }
         else
         {
             return executeDecimalImpl<LeftDataType, RightDataType, ResultDataType, NativeType<typename ResultDataType::FieldType>>(
-                left, right, col_left_const, col_right_const, col_left_vec, col_right_vec, col_left_size, result);
+                left_type, right_type, col_left_const, col_right_const, col_left_vec, col_right_vec, rows, result_type);
         }
     }
 
 private:
     // ResultDataType e.g. DataTypeDecimal<Decimal32>
-    template <class LeftDataType, class RightDataType, class ResultDataType, class ScaleDataType, bool CalculateWith256 = false>
+    template <typename LeftDataType, typename RightDataType, typename ResultDataType, typename ScaledNativeType, bool calculate_with_256_ = false>
     static ColumnPtr executeDecimalImpl(
-        const auto & left,
-        const auto & right,
-        const ColumnConst * const col_left_const,
-        const ColumnConst * const col_right_const,
-        const auto * const col_left,
-        const auto * const col_right,
-        size_t col_left_size,
-        const ResultDataType & resultDataType)
+        const LeftDataType & left_type,
+        const RightDataType & right_type,
+        const ColumnConst * col_left_const,
+        const ColumnConst * col_right_const,
+        const ColumnDecimal<typename LeftDataType::FieldType> * col_left_vec,
+        const ColumnDecimal<typename LeftDataType::FieldType> * col_right_vec,
+        size_t rows,
+        const ResultDataType & result_data_type)
     {
         using LeftFieldType = typename LeftDataType::FieldType;
         using RightFieldType = typename RightDataType::FieldType;
         using ResultFieldType = typename ResultDataType::FieldType;
-
         using ColVecResult = ColumnVectorOrDecimal<ResultFieldType>;
 
-        size_t max_scale = getMaxScaled(left.getScale(), right.getScale(), resultDataType.getScale());
+        size_t max_scale = getMaxScaled(left_type.getScale(), right_type.getScale(), result_data_type.getScale());
 
-        ScaleDataType scale_left = [&]
+        ScaledNativeType scale_left = [&]
         {
             if constexpr (is_multiply)
-                return ScaleDataType{1};
+                return ScaledNativeType{1};
 
             // cast scale same to left
-            auto diff_scale = max_scale - left.getScale();
+            auto diff_scale = max_scale - left_type.getScale();
             if constexpr (is_division)
-                return DecimalUtils::scaleMultiplier<ScaleDataType>(diff_scale + max_scale);
+                return DecimalUtils::scaleMultiplier<ScaledNativeType>(diff_scale + max_scale);
             else
-                return DecimalUtils::scaleMultiplier<ScaleDataType>(diff_scale);
+                return DecimalUtils::scaleMultiplier<ScaledNativeType>(diff_scale);
         }();
 
-        const ScaleDataType scale_right = [&]
+        ScaledNativeType scale_right = [&]
         {
             if constexpr (is_multiply)
-                return ScaleDataType{1};
+                return ScaledNativeType{1};
             else
-                return DecimalUtils::scaleMultiplier<ScaleDataType>(max_scale - right.getScale());
+                return DecimalUtils::scaleMultiplier<ScaledNativeType>(max_scale - right_type.getScale());
         }();
 
 
         bool calculate_with_256 = false;
-        if constexpr (CalculateWith256)
+        if constexpr (calculate_with_256_)
             calculate_with_256 = true;
         else
         {
-            auto p1 = left.getPrecision();
-            auto p2 = right.getPrecision();
-            if (DataTypeDecimal<LeftFieldType>::maxPrecision() < p1 + max_scale - left.getScale()
-                || DataTypeDecimal<RightFieldType>::maxPrecision() < p2 + max_scale - right.getScale())
+            auto p1 = left_type.getPrecision();
+            auto p2 = right_type.getPrecision();
+            if (DataTypeDecimal<LeftFieldType>::maxPrecision() < p1 + max_scale - left_type.getScale()
+                || DataTypeDecimal<RightFieldType>::maxPrecision() < p2 + max_scale - right_type.getScale())
                 calculate_with_256 = true;
         }
 
-        ColumnUInt8::MutablePtr col_null_map_to = ColumnUInt8::create(col_left_size, false);
-        ColumnUInt8::Container * vec_null_map_to = &col_null_map_to->getData();
+        auto res_vec = ColVecResult::create(rows, result_data_type.getScale());
+        auto & res_vec_data = res_vec->getData();
+        auto res_null_map = ColumnUInt8::create(rows, 0);
+        const auto & res_nullmap_data = &res_null_map->getData();
 
-        typename ColVecResult::MutablePtr col_res = ColVecResult::create(0, resultDataType.getScale());
-        auto & vec_res = col_res->getData();
-        vec_res.resize(col_left_size);
-
-        if (col_left && col_right)
+        if (col_left_vec && col_right_vec)
         {
             if (calculate_with_256)
             {
                 process<OpCase::Vector, true>(
-                    col_left->getData(),
-                    col_right->getData(),
-                    vec_res,
+                    col_left_vec->getData().data(),
+                    col_right_vec->getData().data(),
+                    res_vec_data,
+                    res_nullmap_data,
+                    rows,
                     scale_left,
                     scale_right,
-                    *vec_null_map_to,
-                    resultDataType,
-                    max_scale);
+                    max_scale,
+                    result_data_type);
             }
             else
             {
                 process<OpCase::Vector, false>(
-                    col_left->getData(),
-                    col_right->getData(),
-                    vec_res,
+                    col_left_vec->getData().data(),
+                    col_right_vec->getData().data(),
+                    res_vec_data,
+                    res_nullmap_data,
+                    rows,
                     scale_left,
                     scale_right,
-                    *vec_null_map_to,
-                    resultDataType,
-                    max_scale);
+                    max_scale,
+                    result_data_type);
             }
         }
-        else if (col_left_const && col_right)
+        else if (col_left_const && col_right_vec)
         {
-            LeftFieldType const_left = col_left_const->getValue<LeftFieldType>();
-
+            LeftFieldType left_value = col_left_const->getValue<LeftFieldType>();
             if (calculate_with_256)
             {
                 process<OpCase::LeftConstant, true>(
-                    const_left, col_right->getData(), vec_res, scale_left, scale_right, *vec_null_map_to, resultDataType, max_scale);
+                    &left_value,
+                    col_right_vec->getData().data(),
+                    res_vec_data,
+                    res_nullmap_data,
+                    rows,
+                    scale_left,
+                    scale_right,
+                    max_scale,
+                    result_data_type);
             }
             else
             {
                 process<OpCase::LeftConstant, false>(
-                    const_left, col_right->getData(), vec_res, scale_left, scale_right, *vec_null_map_to, resultDataType, max_scale);
+                    &left_value,
+                    col_right_vec->getData().data(),
+                    res_vec_data,
+                    res_nullmap_data,
+                    rows,
+                    scale_left,
+                    scale_right,
+                    max_scale,
+                    result_data_type);
             }
         }
-        else if (col_left && col_right_const)
+        else if (col_left_vec && col_right_const)
         {
-            RightFieldType const_right = col_right_const->getValue<RightFieldType>();
+            RightFieldType right_value = col_right_const->getValue<RightFieldType>();
             if (calculate_with_256)
             {
                 process<OpCase::RightConstant, true>(
-                    col_left->getData(), const_right, vec_res, scale_left, scale_right, *vec_null_map_to, resultDataType, max_scale);
+                    col_left_vec->getData().data(),
+                    &right_value,
+                    res_vec_data,
+                    res_nullmap_data,
+                    rows,
+                    scale_left,
+                    scale_right,
+                    max_scale,
+                    result_data_type);
             }
             else
             {
                 process<OpCase::RightConstant, false>(
-                    col_left->getData(), const_right, vec_res, scale_left, scale_right, *vec_null_map_to, resultDataType, max_scale);
+                    col_left_vec->getData(),
+                    right_value,
+                    res_vec_data,
+                    res_nullmap_data,
+                    rows,
+                    scale_left,
+                    scale_right,
+                    max_scale,
+                    result_data_type);
             }
         }
         else
             throw Exception(ErrorCodes::LOGICAL_ERROR, "Not supported.");
 
-        return ColumnNullable::create(std::move(col_res), std::move(col_null_map_to));
+        return ColumnNullable::create(std::move(res_vec), std::move(res_null_map));
     }
 
-    template <OpCase op_case, bool CalculateWith256, typename ResultContainerType, typename ResultDataType, typename ScaleDataType>
-    static static void NO_INLINE process(
-        const auto & a,
-        const auto & b,
-        ResultContainerType & result_container,
-        const ScaleDataType & scale_a,
-        const ScaleDataType & scale_b,
-        ColumnUInt8::Container & vec_null_map_to,
-        const ResultDataType & resultDataType,
-        size_t max_scale)
+    template <
+        OpCase op_case,
+        bool calculate_with_256,
+        typename LeftDataType,
+        typename RightDataType,
+        typename ResultDataType,
+        typename ScaledNativeType>
+    static void NO_INLINE process(
+        const LeftDataType::FieldType * __restrict left_data, // maybe scalar or vector
+        const RightDataType::FieldType * __restrict right_data, // maybe scalar or vector
+        PaddedPODArray<typename ResultDataType::FieldType> & __restrict res_vec_data,
+        NullMap & res_nullmap_data,
+        size_t rows,
+        const ScaledNativeType & scale_left,
+        const ScaledNativeType & scale_right,
+        size_t max_scale,
+        const ResultDataType & result_data_type)
     {
-        using NativeResultType = NativeType<typename ResultDataType::FieldType>;
-
-        size_t size;
-        if constexpr (op_case == OpCase::LeftConstant)
-            size = b.size();
-        else
-            size = a.size();
+        using ResultNativeType = NativeType<typename ResultDataType::FieldType>;
 
         if constexpr (op_case == OpCase::Vector)
         {
-            for (size_t i = 0; i < size; ++i)
+            for (size_t i = 0; i < rows; ++i)
             {
-                NativeResultType res;
-                if (calculate<CalculateWith256>(
-                        unwrap<op_case, OpCase::LeftConstant>(a, i),
-                        unwrap<op_case, OpCase::RightConstant>(b, i),
-                        scale_a,
-                        scale_b,
-                        res,
-                        resultDataType,
-                        max_scale))
-                    result_container[i] = res;
+                ResultNativeType res;
+                if (calculate<calculate_with_256>(
+                        unwrap<op_case == OpCase::LeftConstant>(left_data, i),
+                        unwrap<op_case == OpCase::RightConstant>(right_data, i),
+                        scale_left,
+                        scale_right,
+                        max_scale,
+                        result_data_type,
+                        res))
+                    res_vec_data[i] = res;
                 else
-                    vec_null_map_to[i] = static_cast<UInt8>(1);
+                    res_nullmap_data[i] = 1;
             }
         }
         else if constexpr (op_case == OpCase::LeftConstant)
         {
-            ScaleDataType scaled_a = applyScaled(unwrap<op_case, OpCase::LeftConstant>(a, 0), scale_a);
-            for (size_t i = 0; i < size; ++i)
+            ScaledNativeType scaled_left = applyScaled(unwrap<op_case == OpCase::LeftConstant>(left_data, 0), scale_left);
+            for (size_t i = 0; i < rows; ++i)
             {
-                NativeResultType res;
-                if (calculate<CalculateWith256>(
-                        scaled_a,
-                        unwrap<op_case, OpCase::RightConstant>(b, i),
-                        static_cast<ScaleDataType>(0),
-                        scale_b,
-                        res,
-                        resultDataType,
-                        max_scale))
-                    result_container[i] = res;
+                ResultNativeType res;
+                if (calculate<calculate_with_256>(
+                        scaled_left,
+                        unwrap<op_case == OpCase::RightConstant>(right_data, i),
+                        0,
+                        scale_right,
+                        max_scale,
+                        result_data_type,
+                        res))
+                    res_vec_data[i] = res;
                 else
-                    vec_null_map_to[i] = static_cast<UInt8>(1);
+                    res_nullmap_data[i] = 1;
             }
         }
         else if constexpr (op_case == OpCase::RightConstant)
         {
-            ScaleDataType scaled_b = applyScaled(unwrap<op_case, OpCase::RightConstant>(b, 0), scale_b);
-
-            for (size_t i = 0; i < size; ++i)
+            ScaledNativeType scaled_right = applyScaled(unwrap<op_case == OpCase::RightConstant>(right_data, 0), scale_right);
+            for (size_t i = 0; i < rows; ++i)
             {
-                NativeResultType res;
-                if (calculate<CalculateWith256>(
-                        unwrap<op_case, OpCase::LeftConstant>(a, i),
-                        scaled_b,
-                        scale_a,
-                        static_cast<ScaleDataType>(0),
-                        res,
-                        resultDataType,
-                        max_scale))
-                    result_container[i] = res;
+                ResultNativeType res;
+                if (calculate<calculate_with_256>(
+                        unwrap<op_case == OpCase::LeftConstant>(left_data, i),
+                        scaled_right,
+                        scale_left,
+                        0,
+                        max_scale,
+                        result_data_type,
+                        res))
+                    res_vec_data[i] = res;
                 else
-                    vec_null_map_to[i] = static_cast<UInt8>(1);
+                    res_nullmap_data[i] = 1;
             }
         }
     }
 
     // ResultNativeType = Int32/64/128/256
-    template <bool CalculateWith256, typename LeftNativeType, typename RightNativeType, typename NativeResultType, typename ResultDataType, typename ScaleDataType>
+    template <
+        bool calculate_with_256,
+        typename LeftNativeType,
+        typename RightNativeType,
+        typename ResultNativeType,
+        typename ResultDataType,
+        typename ScaledNativeType>
     static NO_SANITIZE_UNDEFINED bool calculate(
-        const LeftNativeType l,
-        const RightNativeType r,
-        const ScaleDataType & scale_left,
-        const ScaleDataType & scale_right,
-        NativeResultType & res,
-        const ResultDataType & resultDataType,
-        size_t max_scale)
+        const LeftNativeType left,
+        const RightNativeType right,
+        const ScaledNativeType & scale_left,
+        const ScaledNativeType & scale_right,
+        size_t max_scale,
+        const ResultDataType & result_data_type,
+        ResultNativeType & res)
     {
-        if constexpr (CalculateWith256)
-            return calculateImpl<Int256>(l, r, scale_left, scale_right, res, resultDataType, max_scale);
-        else if (is_division)
-            return calculateImpl<Int128>(l, r, scale_left, scale_right, res, resultDataType, max_scale);
+        if constexpr (calculate_with_256)
+            return calculateImpl<Int256>(left, right, scale_left, scale_right, max_scale, result_data_type, res);
+        else if constexpr (is_division)
+            return calculateImpl<Int128>(left, right, scale_left, scale_right, max_scale, result_data_type, res);
         else
-            return calculateImpl<NativeResultType>(l, r, scale_left, scale_right, res, resultDataType, max_scale);
+            return calculateImpl<ResultNativeType>(left, right, scale_left, scale_right, max_scale, result_data_type, res);
     }
 
-    template <typename CalcType, typename LeftNativeType, typename RightNativeType, typename NativeResultType, typename ResultDataType, typename ScaleDataType>
+    template <
+        typename Type,
+        typename LeftNativeType,
+        typename RightNativeType,
+        typename ResultNativeType,
+        typename ResultDataType,
+        typename ScaleDataType>
     static NO_SANITIZE_UNDEFINED bool calculateImpl(
-        const LeftNativeType & l,
-        const RightNativeType & r,
+        const LeftNativeType & left,
+        const RightNativeType & right,
         const ScaleDataType & scale_left,
         const ScaleDataType & scale_right,
-        NativeResultType & res,
-        const ResultDataType & resultDataType,
-        size_t max_scale)
+        size_t max_scale,
+        const ResultDataType & result_data_type,
+        ResultNativeType & res)
     {
-        CalcType scaled_l = applyScaled(static_cast<CalcType>(l), static_cast<CalcType>(scale_left));
-        CalcType scaled_r = applyScaled(static_cast<CalcType>(r), static_cast<CalcType>(scale_right));
-
-        CalcType c_res = 0;
-        auto success = Operation::template apply<CalcType>(scaled_l, scaled_r, c_res);
+        Type scaled_left = applyScaled(static_cast<Type>(left), static_cast<Type>(scale_left));
+        Type scaled_right = applyScaled(static_cast<Type>(right), static_cast<Type>(scale_right));
+        Type c_res = 0;
+        auto success = Operation::template apply<Type>(scaled_left, scaled_right, c_res);
         if (!success)
             return false;
 
-        auto result_scale = resultDataType.getScale();
+        auto result_scale = result_data_type.getScale();
         auto scale_diff = max_scale - result_scale;
         chassert(scale_diff >= 0);
         if (scale_diff)
         {
-            auto scaled_diff = DecimalUtils::scaleMultiplier<CalcType>(scale_diff);
-            DecimalDivideImpl::apply<CalcType>(c_res, scaled_diff, c_res);
+            auto scaled_diff = DecimalUtils::scaleMultiplier<Type>(scale_diff);
+            DecimalDivideImpl::apply<Type>(c_res, scaled_diff, c_res);
         }
 
         // check overflow
-        if constexpr (std::is_same_v<CalcType, Int256> || is_division)
+        if constexpr (std::is_same_v<Type, Int256> || is_division)
         {
-            auto max_value = intExp10OfSize<CalcType>(resultDataType.getPrecision());
+            auto max_value = intExp10OfSize<Type>(result_data_type.getPrecision());
             if (c_res <= -max_value || c_res >= max_value)
                 return false;
         }
 
-        res = static_cast<NativeResultType>(c_res);
-
+        res = static_cast<ResultNativeType>(c_res);
         return true;
     }
 
-    template <OpCase op_case, OpCase target, class E>
-    static auto unwrap(const E & elem, size_t i)
+    /// Unwrap underlying native type from decimal type
+    template <bool is_scalar, class E>
+    static auto unwrap(const E * elem, size_t i)
     {
-        if constexpr (op_case == target)
-            return elem.value;
+        if constexpr (is_scalar)
+            return elem->value;
         else
             return elem[i].value;
     }
 
     template <typename NativeType, typename ScaleType>
-    static ScaleType applyScaled(const NativeType & l, const ScaleType & scale)
+    static ScaleType applyScaled(const NativeType & n, const ScaleType & scale)
     {
         if (scale > 1)
-            return common::mulIgnoreOverflow(l, scale);
+            return common::mulIgnoreOverflow(n, scale);
 
-        return static_cast<ScaleType>(l);
+        return static_cast<ScaleType>(n);
     }
 
-    static size_t getMaxScaled(const size_t left_scale, const size_t right_scale, const size_t result_scale)
+    static size_t getMaxScaled(size_t left_scale, size_t right_scale, size_t result_scale)
     {
         if constexpr (is_multiply)
             return left_scale + right_scale;

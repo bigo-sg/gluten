@@ -39,14 +39,15 @@ static bool canCastLower(const Int128 & a, const Int128 & b)
 
 struct DecimalPlusImpl
 {
-    template <typename A>
-    static bool apply(A & a, A & b, A & r)
+    template <typename T>
+    static bool apply(T a, T b, T & r)
     {
         return !common::addOverflow(a, b, r);
     }
 
+    /*
     template <>
-    static bool apply(Int128 & a, Int128 & b, Int128 & r)
+    static bool apply(Int128 a, Int128 b, Int128 & r)
     {
         if (canCastLower(a, b))
         {
@@ -57,13 +58,12 @@ struct DecimalPlusImpl
             r = static_cast<Int128>(low_result);
             return true;
         }
-
         return !common::addOverflow(a, b, r);
     }
 
 
     template <>
-    static bool apply(Int256 & a, Int256 & b, Int256 & r)
+    static bool apply(Int256 a, Int256 b, Int256 & r)
     {
         if (canCastLower(a, b))
         {
@@ -74,9 +74,9 @@ struct DecimalPlusImpl
             r = static_cast<Int256>(low_result);
             return true;
         }
-
         return !common::addOverflow(a, b, r);
     }
+    */
 
 
 #if USE_EMBEDDED_COMPILER
@@ -92,12 +92,13 @@ struct DecimalPlusImpl
 struct DecimalMinusImpl
 {
     /// Apply operation and check overflow. It's used for Deciamal operations. @returns true if overflowed, false otherwise.
-    template <typename A>
-    static bool apply(A & a, A & b, A & r)
+    template <typename T>
+    static bool apply(T a, T b, T & r)
     {
         return !common::subOverflow(a, b, r);
     }
 
+    /*
     template <>
     static bool apply(Int128 & a, Int128 & b, Int128 & r)
     {
@@ -129,6 +130,7 @@ struct DecimalMinusImpl
 
         return !common::subOverflow(a, b, r);
     }
+    */
 
 #if USE_EMBEDDED_COMPILER
     static constexpr bool compilable = true;
@@ -144,12 +146,13 @@ struct DecimalMinusImpl
 struct DecimalMultiplyImpl
 {
     /// Apply operation and check overflow. It's used for Decimal operations. @returns true if overflowed, false otherwise.
-    template <typename A>
-    static bool apply(A & a, A & b, A & c)
+    template <typename T>
+    static bool apply(T a, T b, T & c)
     {
         return !common::mulOverflow(a, b, c);
     }
 
+    /*
     template <Int128>
     static bool apply(Int128 & a, Int128 & b, Int128 & r)
     {
@@ -165,6 +168,7 @@ struct DecimalMultiplyImpl
 
         return !common::mulOverflow(a, b, r);
     }
+    */
 
 #if USE_EMBEDDED_COMPILER
     static constexpr bool compilable = true;
@@ -178,8 +182,8 @@ struct DecimalMultiplyImpl
 
 struct DecimalDivideImpl
 {
-    template <typename A>
-    static bool apply(A & a, A & b, A & r)
+    template <typename T>
+    static bool apply(T a, T b, T & r)
     {
         if (b == 0)
             return false;
@@ -188,8 +192,9 @@ struct DecimalDivideImpl
         return true;
     }
 
+    /*
     template <>
-    static bool apply(Int128 & a, Int128 & b, Int128 & r)
+    static bool apply(Int128 a, Int128 b, Int128 & r)
     {
         if (b == 0)
             return false;
@@ -223,6 +228,7 @@ struct DecimalDivideImpl
         r = a / b;
         return true;
     }
+    */
 
 #if USE_EMBEDDED_COMPILER
     static constexpr bool compilable = true;
@@ -238,8 +244,8 @@ struct DecimalDivideImpl
 // ModuloImpl
 struct DecimalModuloImpl
 {
-    template <typename A>
-    static bool apply(A & a, A & b, A & r)
+    template <typename T>
+    static bool apply(T a, T b, T & r)
     {
         if (b == 0)
             return false;
