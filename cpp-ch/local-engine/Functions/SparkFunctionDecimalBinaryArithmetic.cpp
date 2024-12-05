@@ -100,46 +100,40 @@ public:
         using LeftDataType = std::decay_t<decltype(left)>; // e.g. DataTypeDecimal<Decimal32>
         using RightDataType = std::decay_t<decltype(right)>; // e.g. DataTypeDecimal<Decimal32>
         using ResultDataType = std::decay_t<decltype(result)>; // e.g. DataTypeDecimal<Decimal32>
-
         using ColVecLeft = ColumnVectorOrDecimal<typename LeftDataType::FieldType>;
         using ColVecRight = ColumnVectorOrDecimal<typename RightDataType::FieldType>;
 
-        const ColumnPtr left_col = arguments[0].column;
-        const ColumnPtr right_col = arguments[1].column;
+        ColumnPtr col_left = arguments[0].column;
+        ColumnPtr col_right = arguments[1].column;
 
-        const auto * const col_left_raw = left_col.get();
-        const auto * const col_right_raw = right_col.get();
+        const ColumnConst * col_left_const = checkAndGetColumnConst<ColVecLeft>(col_left.get());
+        const ColumnConst * col_right_const = checkAndGetColumnConst<ColVecRight>(col_right.get());
+        const ColVecLeft * col_left_vec = checkAndGetColumn<ColVecLeft>(col_left.get());
+        const ColVecRight * col_right_vec = checkAndGetColumn<ColVecRight>(col_right.get());
 
-        const size_t col_left_size = col_left_raw->size();
-
-        const ColumnConst * const col_left_const = checkAndGetColumnConst<ColVecLeft>(col_left_raw);
-        const ColumnConst * const col_right_const = checkAndGetColumnConst<ColVecRight>(col_right_raw);
-
-        const ColVecLeft * const col_left = checkAndGetColumn<ColVecLeft>(col_left_raw);
-        const ColVecRight * const col_right = checkAndGetColumn<ColVecRight>(col_right_raw);
-
+        const size_t col_left_size = col_left->size();
         if constexpr (Mode == OpMode::Effect)
         {
             return executeDecimalImpl<LeftDataType, RightDataType, ResultDataType, NativeType<typename ResultDataType::FieldType>>(
-                left, right, col_left_const, col_right_const, col_left, col_right, col_left_size, result);
+                left, right, col_left_const, col_right_const, col_left_vec, col_right_vec, col_left_size, result);
         }
 
         if (calculateWith256<is_plus_minus, is_multiply, is_division, is_modulo>(*arguments[0].type.get(), *arguments[1].type.get()))
         {
             return executeDecimalImpl<LeftDataType, RightDataType, ResultDataType, Int256, true>(
-                left, right, col_left_const, col_right_const, col_left, col_right, col_left_size, result);
+                left, right, col_left_const, col_right_const, col_left_vec, col_right_vec, col_left_size, result);
         }
 
         size_t max_scale = getMaxScaled(left.getScale(), right.getScale(), result.getScale());
         if (is_division && max_scale - left.getScale() + max_scale > DataTypeDecimal<typename ResultDataType::FieldType>::maxPrecision())
         {
             return executeDecimalImpl<LeftDataType, RightDataType, ResultDataType, Int256, true>(
-                left, right, col_left_const, col_right_const, col_left, col_right, col_left_size, result);
+                left, right, col_left_const, col_right_const, col_left_vec, col_right_vec, col_left_size, result);
         }
         else
         {
             return executeDecimalImpl<LeftDataType, RightDataType, ResultDataType, NativeType<typename ResultDataType::FieldType>>(
-                left, right, col_left_const, col_right_const, col_left, col_right, col_left_size, result);
+                left, right, col_left_const, col_right_const, col_left_vec, col_right_vec, col_left_size, result);
         }
     }
 
@@ -262,9 +256,7 @@ private:
             }
         }
         else
-        {
             throw Exception(ErrorCodes::LOGICAL_ERROR, "Not supported.");
-        }
 
         return ColumnNullable::create(std::move(col_res), std::move(col_null_map_to));
     }
@@ -470,7 +462,7 @@ public:
                 arguments[2].type->getName(),
                 getName());
 
-        return std::make_shared<DataTypeNullable>(arguments[2].type);
+        return makeNullable(arguments[2].type);
     }
 
     // executeImpl2
