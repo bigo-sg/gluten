@@ -98,14 +98,11 @@ public:
     static ColumnPtr executeDecimal(
         const ColumnsWithTypeAndName & arguments,
         const LeftDataType & left_type,
-        const LeftDataType & right_type,
+        const RightDataType & right_type,
         const ResultDataType & result_type)
     {
-        // using LeftDataType = std::decay_t<decltype(left_type)>; // e.g. DataTypeDecimal<Decimal32>
-        // using RightDataType = std::decay_t<decltype(right_type)>; // e.g. DataTypeDecimal<Decimal32>
-        // using ResultDataType = std::decay_t<decltype(result_type)>; // e.g. DataTypeDecimal<Decimal32>
-        using ColVecLeft = ColumnVectorOrDecimal<typename LeftDataType::FieldType>;
-        using ColVecRight = ColumnVectorOrDecimal<typename RightDataType::FieldType>;
+        using ColVecLeft = ColumnDecimal<typename LeftDataType::FieldType>;
+        using ColVecRight = ColumnDecimal<typename RightDataType::FieldType>;
 
         ColumnPtr col_left = arguments[0].column;
         ColumnPtr col_right = arguments[1].column;
@@ -150,7 +147,7 @@ private:
         const ColumnConst * col_left_const,
         const ColumnConst * col_right_const,
         const ColumnDecimal<typename LeftDataType::FieldType> * col_left_vec,
-        const ColumnDecimal<typename LeftDataType::FieldType> * col_right_vec,
+        const ColumnDecimal<typename RightDataType::FieldType> * col_right_vec,
         size_t rows,
         const ResultDataType & result_data_type)
     {
@@ -166,12 +163,11 @@ private:
             if constexpr (is_multiply)
                 return ScaledNativeType{1};
 
-            // cast scale same to left
-            auto diff_scale = max_scale - left_type.getScale();
+            auto diff = max_scale - left_type.getScale();
             if constexpr (is_division)
-                return DecimalUtils::scaleMultiplier<ScaledNativeType>(diff_scale + max_scale);
+                return DecimalUtils::scaleMultiplier<ScaledNativeType>(diff + max_scale);
             else
-                return DecimalUtils::scaleMultiplier<ScaledNativeType>(diff_scale);
+                return DecimalUtils::scaleMultiplier<ScaledNativeType>(diff);
         }();
 
         ScaledNativeType scale_right = [&]
@@ -198,7 +194,7 @@ private:
         auto res_vec = ColVecResult::create(rows, result_data_type.getScale());
         auto & res_vec_data = res_vec->getData();
         auto res_null_map = ColumnUInt8::create(rows, 0);
-        const auto & res_nullmap_data = &res_null_map->getData();
+        auto & res_nullmap_data = res_null_map->getData();
 
         if (col_left_vec && col_right_vec)
         {
@@ -278,8 +274,8 @@ private:
             else
             {
                 process<OpCase::RightConstant, false>(
-                    col_left_vec->getData(),
-                    right_value,
+                    col_left_vec->getData().data(),
+                    &right_value,
                     res_vec_data,
                     res_nullmap_data,
                     rows,
@@ -298,14 +294,14 @@ private:
     template <
         OpCase op_case,
         bool calculate_with_256,
-        typename LeftDataType,
-        typename RightDataType,
+        typename LeftFieldType,
+        typename RightFieldType,
         typename ResultDataType,
         typename ScaledNativeType>
     static void NO_INLINE process(
-        const LeftDataType::FieldType * __restrict left_data, // maybe scalar or vector
-        const RightDataType::FieldType * __restrict right_data, // maybe scalar or vector
-        PaddedPODArray<typename ResultDataType::FieldType> & __restrict res_vec_data,
+        const LeftFieldType * __restrict left_data, // maybe scalar or vector
+        const RightFieldType * __restrict right_data, // maybe scalar or vector
+        PaddedPODArray<typename ResultDataType::FieldType> & __restrict res_vec_data, // should be vector
         NullMap & res_nullmap_data,
         size_t rows,
         const ScaledNativeType & scale_left,
@@ -342,7 +338,7 @@ private:
                 if (calculate<calculate_with_256>(
                         scaled_left,
                         unwrap<op_case == OpCase::RightConstant>(right_data, i),
-                        0,
+                        static_cast<ScaledNativeType>(0),
                         scale_right,
                         max_scale,
                         result_data_type,
@@ -362,7 +358,7 @@ private:
                         unwrap<op_case == OpCase::LeftConstant>(left_data, i),
                         scaled_right,
                         scale_left,
-                        0,
+                        static_cast<ScaledNativeType>(0),
                         max_scale,
                         result_data_type,
                         res))
