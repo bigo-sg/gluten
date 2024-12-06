@@ -45,7 +45,6 @@ struct DecimalPlusImpl
         return !common::addOverflow(a, b, r);
     }
 
-    /*
     template <>
     static bool apply(Int128 a, Int128 b, Int128 & r)
     {
@@ -61,7 +60,6 @@ struct DecimalPlusImpl
         return !common::addOverflow(a, b, r);
     }
 
-
     template <>
     static bool apply(Int256 a, Int256 b, Int256 & r)
     {
@@ -76,8 +74,6 @@ struct DecimalPlusImpl
         }
         return !common::addOverflow(a, b, r);
     }
-    */
-
 
 #if USE_EMBEDDED_COMPILER
     static constexpr bool compilable = true;
@@ -98,9 +94,8 @@ struct DecimalMinusImpl
         return !common::subOverflow(a, b, r);
     }
 
-    /*
     template <>
-    static bool apply(Int128 & a, Int128 & b, Int128 & r)
+    static bool apply(Int128 a, Int128 b, Int128 & r)
     {
         if (canCastLower(a, b))
         {
@@ -116,7 +111,7 @@ struct DecimalMinusImpl
     }
 
     template <>
-    static bool apply(Int256 & a, Int256 & b, Int256 & r)
+    static bool apply(Int256 a, Int256 b, Int256 & r)
     {
         if (canCastLower(a, b))
         {
@@ -130,7 +125,6 @@ struct DecimalMinusImpl
 
         return !common::subOverflow(a, b, r);
     }
-    */
 
 #if USE_EMBEDDED_COMPILER
     static constexpr bool compilable = true;
@@ -152,9 +146,8 @@ struct DecimalMultiplyImpl
         return !common::mulOverflow(a, b, c);
     }
 
-    /*
     template <Int128>
-    static bool apply(Int128 & a, Int128 & b, Int128 & r)
+    static bool apply(Int128 a, Int128 b, Int128 & r)
     {
         if (canCastLower(a, b))
         {
@@ -168,7 +161,6 @@ struct DecimalMultiplyImpl
 
         return !common::mulOverflow(a, b, r);
     }
-    */
 
 #if USE_EMBEDDED_COMPILER
     static constexpr bool compilable = true;
@@ -192,7 +184,6 @@ struct DecimalDivideImpl
         return true;
     }
 
-    /*
     template <>
     static bool apply(Int128 a, Int128 b, Int128 & r)
     {
@@ -210,7 +201,7 @@ struct DecimalDivideImpl
     }
 
     template <>
-    static bool apply(Int256 & a, Int256 & b, Int256 & r)
+    static bool apply(Int256 a, Int256 b, Int256 & r)
     {
         if (b == 0)
             return false;
@@ -228,7 +219,6 @@ struct DecimalDivideImpl
         r = a / b;
         return true;
     }
-    */
 
 #if USE_EMBEDDED_COMPILER
     static constexpr bool compilable = true;

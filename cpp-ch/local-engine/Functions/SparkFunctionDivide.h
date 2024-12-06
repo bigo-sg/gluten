@@ -164,8 +164,6 @@ public:
         return true;
     }
 
-
-
     llvm::Value *
     compileImpl(llvm::IRBuilderBase & builder, const ValuesWithType & arguments, const DataTypePtr & result_type) const override
     {
