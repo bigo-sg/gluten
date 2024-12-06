@@ -61,7 +61,7 @@ enum class OpMode : uint8_t
     Effect
 };
 
-template <bool is_plus_minus, bool is_multiply, bool is_division, bool is_modulo>
+template <typename Operation>
 bool shouldCalculateWith256(const IDataType & left, const IDataType & right)
 {
     size_t p1 = getDecimalPrecision(left);
@@ -70,13 +70,13 @@ bool shouldCalculateWith256(const IDataType & left, const IDataType & right)
     size_t s2 = getDecimalScale(right);
 
     size_t precision;
-    if constexpr (is_plus_minus)
+    if constexpr (SparkIsOperation<Operation>::plus_minus)
         precision = std::max(s1, s2) + std::max(p1 - s1, p2 - s2) + 1;
-    else if constexpr (is_multiply)
+    else if constexpr (SparkIsOperation<Operation>::multiply)
         precision = p1 + p2 + 1;
-    else if constexpr (is_division)
+    else if constexpr (SparkIsOperation<Operation>::division)
         precision = p1 - s1 + s2 + std::max(static_cast<size_t>(6), s1 + p2 + 1);
-    else if constexpr (is_modulo)
+    else if constexpr (SparkIsOperation<Operation>::modulo)
         precision = std::min(p1 - s1, p2 - s2) + std::max(s1, s2);
     else
         throw Exception(ErrorCodes::LOGICAL_ERROR, "Not supported.");
@@ -88,7 +88,7 @@ template <typename Operation, OpMode Mode>
 struct SparkDecimalBinaryOperation
 {
 private:
-    static constexpr bool is_plus_minus = SparkIsOperation<Operation>::plus || SparkIsOperation<Operation>::minus;
+    static constexpr bool is_plus_minus = SparkIsOperation<Operation>::plus_minus;
     static constexpr bool is_multiply = SparkIsOperation<Operation>::multiply;
     static constexpr bool is_division = SparkIsOperation<Operation>::division;
     static constexpr bool is_modulo = SparkIsOperation<Operation>::modulo;
@@ -119,7 +119,7 @@ public:
                 left_type, right_type, col_left_const, col_right_const, col_left_vec, col_right_vec, rows, result_type);
         }
 
-        if (shouldCalculateWith256<is_plus_minus, is_multiply, is_division, is_modulo>(*arguments[0].type, *arguments[1].type))
+        if (shouldCalculateWith256<Operation>(left_type, right_type))
         {
             return executeDecimalImpl<LeftDataType, RightDataType, ResultDataType, Int256, true>(
                 left_type, right_type, col_left_const, col_right_const, col_left_vec, col_right_vec, rows, result_type);
@@ -317,8 +317,8 @@ private:
             {
                 ResultNativeType res;
                 if (calculate<calculate_with_256>(
-                        unwrap<op_case == OpCase::LeftConstant>(left_data, i),
-                        unwrap<op_case == OpCase::RightConstant>(right_data, i),
+                        static_cast<ScaledNativeType>(unwrap<op_case == OpCase::LeftConstant>(left_data, i)),
+                        static_cast<ScaledNativeType>(unwrap<op_case == OpCase::RightConstant>(right_data, i)),
                         scale_left,
                         scale_right,
                         max_scale,
@@ -331,13 +331,15 @@ private:
         }
         else if constexpr (op_case == OpCase::LeftConstant)
         {
-            ScaledNativeType scaled_left = applyScaled(unwrap<op_case == OpCase::LeftConstant>(left_data, 0), scale_left);
+            ScaledNativeType scaled_left
+                = applyScaled(static_cast<ScaledNativeType>(unwrap<op_case == OpCase::LeftConstant>(left_data, 0)), scale_left);
+
             for (size_t i = 0; i < rows; ++i)
             {
                 ResultNativeType res;
                 if (calculate<calculate_with_256>(
                         scaled_left,
-                        unwrap<op_case == OpCase::RightConstant>(right_data, i),
+                        static_cast<ScaledNativeType>(unwrap<op_case == OpCase::RightConstant>(right_data, i)),
                         static_cast<ScaledNativeType>(0),
                         scale_right,
                         max_scale,
@@ -350,12 +352,14 @@ private:
         }
         else if constexpr (op_case == OpCase::RightConstant)
         {
-            ScaledNativeType scaled_right = applyScaled(unwrap<op_case == OpCase::RightConstant>(right_data, 0), scale_right);
+            ScaledNativeType scaled_right
+                = applyScaled(static_cast<ScaledNativeType>(unwrap<op_case == OpCase::RightConstant>(right_data, 0)), scale_right);
+
             for (size_t i = 0; i < rows; ++i)
             {
                 ResultNativeType res;
                 if (calculate<calculate_with_256>(
-                        unwrap<op_case == OpCase::LeftConstant>(left_data, i),
+                        static_cast<ScaledNativeType>(unwrap<op_case == OpCase::LeftConstant>(left_data, i)),
                         scaled_right,
                         scale_left,
                         static_cast<ScaledNativeType>(0),
@@ -372,14 +376,12 @@ private:
     // ResultNativeType = Int32/64/128/256
     template <
         bool calculate_with_256,
-        typename LeftNativeType,
-        typename RightNativeType,
+        typename ScaledNativeType,
         typename ResultNativeType,
-        typename ResultDataType,
-        typename ScaledNativeType>
+        typename ResultDataType>
     static NO_SANITIZE_UNDEFINED bool calculate(
-        const LeftNativeType left,
-        const RightNativeType right,
+        const ScaledNativeType & left,
+        const ScaledNativeType & right,
         const ScaledNativeType & scale_left,
         const ScaledNativeType & scale_right,
         size_t max_scale,
@@ -396,16 +398,14 @@ private:
 
     template <
         typename Type,
-        typename LeftNativeType,
-        typename RightNativeType,
+        typename ScaledNativeType,
         typename ResultNativeType,
-        typename ResultDataType,
-        typename ScaleDataType>
+        typename ResultDataType>
     static NO_SANITIZE_UNDEFINED bool calculateImpl(
-        const LeftNativeType & left,
-        const RightNativeType & right,
-        const ScaleDataType & scale_left,
-        const ScaleDataType & scale_right,
+        const ScaledNativeType & left,
+        const ScaledNativeType & right,
+        const ScaledNativeType & scale_left,
+        const ScaledNativeType & scale_right,
         size_t max_scale,
         const ResultDataType & result_data_type,
         ResultNativeType & res)
@@ -439,7 +439,7 @@ private:
     }
 
     /// Unwrap underlying native type from decimal type
-    template <bool is_scalar, class E>
+    template <bool is_scalar, typename E>
     static auto unwrap(const E * elem, size_t i)
     {
         if constexpr (is_scalar)
@@ -448,13 +448,13 @@ private:
             return elem[i].value;
     }
 
-    template <typename NativeType, typename ScaleType>
-    static ScaleType applyScaled(const NativeType & n, const ScaleType & scale)
+    template <typename T>
+    static T applyScaled(T n, T scale)
     {
         if (scale > 1)
             return common::mulIgnoreOverflow(n, scale);
 
-        return static_cast<ScaleType>(n);
+        return n;
     }
 
     static size_t getMaxScaled(size_t left_scale, size_t right_scale, size_t result_scale)
@@ -465,7 +465,6 @@ private:
             return std::max(result_scale, std::max(left_scale, right_scale));
     }
 };
-
 
 /// TODO(taiyang-li): implement JIT for binary deicmal arithmetic functions
 template <class Operation, typename Name, OpMode Mode = OpMode::Default>

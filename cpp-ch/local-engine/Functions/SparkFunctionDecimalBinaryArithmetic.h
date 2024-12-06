@@ -265,6 +265,7 @@ struct SparkIsOperation
 {
     static constexpr bool plus = IsSameOperation<Op, DecimalPlusImpl>::value;
     static constexpr bool minus = IsSameOperation<Op, DecimalMinusImpl>::value;
+    static constexpr bool plus_minus = IsSameOperation<Op, DecimalPlusImpl>::value || IsSameOperation<Op, DecimalMinusImpl>::value;
     static constexpr bool multiply = IsSameOperation<Op, DecimalMultiplyImpl>::value;
     static constexpr bool division = IsSameOperation<Op, DecimalDivideImpl>::value;
     static constexpr bool modulo = IsSameOperation<Op, DecimalModuloImpl>::value;
