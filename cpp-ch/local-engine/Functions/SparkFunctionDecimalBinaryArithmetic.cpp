@@ -31,6 +31,7 @@
 
 #if USE_EMBEDDED_COMPILER
 #include <llvm/IR/IRBuilder.h>
+#include <DataTypes/Native.h>
 #endif
 
 namespace DB
@@ -76,6 +77,40 @@ private:
     static constexpr bool is_modulo = SparkIsOperation<Operation>::modulo;
 
 public:
+    static size_t getMaxScaled(size_t left_scale, size_t right_scale, size_t result_scale)
+    {
+        if constexpr (is_multiply)
+            return left_scale + right_scale;
+        else
+            return std::max(result_scale, std::max(left_scale, right_scale));
+    }
+
+    template <typename LeftDataType, typename RightDataType, typename ResultDataType>
+    static bool shouldPromoteTo256(const LeftDataType & left_type, const RightDataType & right_type, const ResultDataType & result_type)
+    {
+        auto p1 = left_type.getPrecision();
+        auto s1 = left_type.getScale();
+        auto p2 = right_type.getPrecision();
+        auto s2 = right_type.getScale();
+
+        size_t precision;
+        if constexpr (is_plus_minus)
+            precision = std::max<size_t>(s1, s2) + std::max<size_t>(p1 - s1, p2 - s2) + 1;
+        else if constexpr (is_multiply)
+            precision = p1 + p2 + 1;
+        else if constexpr (is_division)
+            precision = p1 - s1 + s2 + std::max<size_t>(6, s1 + p2 + 1);
+        else if constexpr (is_modulo)
+            precision = std::min<size_t>(p1 - s1, p2 - s2) + std::max<size_t>(s1, s2);
+        else
+            throw Exception(ErrorCodes::LOGICAL_ERROR, "Unknown decimal binary operation");
+
+        if (precision > DataTypeDecimal128::maxPrecision())
+            return true;
+
+        return false;
+    }
+
     template <typename LeftDataType, typename RightDataType, typename ResultDataType>
     static ColumnPtr executeDecimal(
         const ColumnsWithTypeAndName & arguments,
@@ -100,22 +135,29 @@ public:
         size_t rows = col_left->size();
         if constexpr (Mode == OpMode::Effect)
         {
-            return executeDecimalImpl<LeftDataType, RightDataType, ResultDataType, NativeType<ResultFieldType>>(
+            return executeDecimalImpl<LeftDataType, RightDataType, ResultDataType, NativeType<ResultFieldType>, false>(
                 left_type, right_type, col_left_const, col_right_const, col_left_vec, col_right_vec, rows, result_type);
         }
 
-        if constexpr (shouldPromoteTo256(left_type, right_type, result_type))
+        if (shouldPromoteTo256(left_type, right_type, result_type))
         {
             return executeDecimalImpl<LeftDataType, RightDataType, ResultDataType, Int256, true>(
                 left_type, right_type, col_left_const, col_right_const, col_left_vec, col_right_vec, rows, result_type);
         }
 
-        return executeDecimalImpl<LeftDataType, RightDataType, ResultDataType, NativeType<ResultFieldType>>(
+        size_t max_scale = getMaxScaled(left_type.getScale(), right_type.getScale(), result_type.getScale());
+        if (is_division && max_scale - left_type.getScale() + max_scale > ResultDataType::maxPrecision())
+        {
+            return executeDecimalImpl<LeftDataType, RightDataType, ResultDataType, Int256, true>(
+                left_type, right_type, col_left_const, col_right_const, col_left_vec, col_right_vec, rows, result_type);
+        }
+
+        return executeDecimalImpl<LeftDataType, RightDataType, ResultDataType, NativeType<ResultFieldType>, false>(
             left_type, right_type, col_left_const, col_right_const, col_left_vec, col_right_vec, rows, result_type);
     }
 
 private:
-    template <typename LeftDataType, typename RightDataType, typename ResultDataType, typename ScaledNativeType, bool calculate_with_256_ = false>
+    template <typename LeftDataType, typename RightDataType, typename ResultDataType, typename ScaledNativeType, bool calculate_with_256_>
     static ColumnPtr executeDecimalImpl(
         const LeftDataType & left_type,
         const RightDataType & right_type,
@@ -434,47 +476,14 @@ private:
 
         return n;
     }
-
-    static size_t getMaxScaled(size_t left_scale, size_t right_scale, size_t result_scale)
-    {
-        if constexpr (is_multiply)
-            return left_scale + right_scale;
-        else
-            return std::max(result_scale, std::max(left_scale, right_scale));
-    }
-
-    template <typename LeftDataType, typename RightDataType, typename ResultDataType>
-    static constexpr bool shouldPromoteTo256(const LeftDataType & left_type, const RightDataType & right_type, const ResultDataType & result_type)
-    {
-        auto p1 = left_type.getPrecision();
-        auto s1 = left_type.getScale();
-        auto p2 = right_type.getPrecision();
-        auto s2 = right_type.getScale();
-
-        size_t precision;
-        if constexpr (is_plus_minus)
-            precision = std::max<size_t>(s1, s2) + std::max<size_t>(p1 - s1, p2 - s2) + 1;
-        else if constexpr (is_multiply)
-            precision = p1 + p2 + 1;
-        else if constexpr (is_division)
-            precision = p1 - s1 + s2 + std::max<size_t>(6, s1 + p2 + 1);
-        else if constexpr (is_modulo)
-            precision = std::min<size_t>(p1 - s1, p2 - s2) + std::max<size_t>(s1, s2);
-        else
-            throw Exception(ErrorCodes::LOGICAL_ERROR, "Unknown decimal binary operation");
-
-        if (precision > DataTypeDecimal128::maxPrecision())
-            return true;
-
-        return false;
-}
-
 };
 
 /// TODO(taiyang-li): implement JIT for binary deicmal arithmetic functions
-template <class Operation, typename Name, OpMode Mode = OpMode::Default>
+template <class Operation, typename Name, OpMode mode = OpMode::Default>
 class SparkFunctionDecimalBinaryArithmetic final : public IFunction
 {
+    static constexpr bool is_plus = SparkIsOperation<Operation>::plus;
+    static constexpr bool is_minus = SparkIsOperation<Operation>::minus;
     static constexpr bool is_plus_minus = SparkIsOperation<Operation>::plus || SparkIsOperation<Operation>::minus;
     static constexpr bool is_multiply = SparkIsOperation<Operation>::multiply;
     static constexpr bool is_division = SparkIsOperation<Operation>::division;
@@ -525,7 +534,7 @@ public:
             right_generic,
             removeNullable(arguments[2].type).get(),
             [&](const auto & left, const auto & right, const auto & result) {
-                return (res = SparkDecimalBinaryOperation<Operation, Mode>::template executeDecimal(arguments, left, right, result))
+                return (res = SparkDecimalBinaryOperation<Operation, mode>::template executeDecimal(arguments, left, right, result))
                     != nullptr;
             });
 
@@ -547,20 +556,18 @@ public:
         return res;
     }
 
-
 #if USE_EMBEDDED_COMPILER
     bool isCompilableImpl(const DataTypes & /*arguments*/, const DataTypePtr & /*result_type*/) const override { return false; }
 
     llvm::Value *
     compileImpl(llvm::IRBuilderBase & builder, const ValuesWithType & arguments, const DataTypePtr & result_type) const override
     {
-        /*
         assert(3 == arguments.size());
 
         const auto & denull_left_type = arguments[0].type;
         const auto & denull_right_type = arguments[1].type;
         const auto & denull_result_type = removeNullable(result_type);
-        llvm::Value * result = nullptr;
+        llvm::Value * nullable_result = nullptr;
 
         castTripleTypes(
             denull_left_type.get(),
@@ -571,18 +578,140 @@ public:
                 using LeftDataType = std::decay_t<decltype(left_type)>;
                 using RightDataType = std::decay_t<decltype(right_type)>;
                 using ResultDataType = std::decay_t<decltype(result_type)>;
+                using LeftFieldType = typename LeftDataType::FieldType;
+                using RightFieldType = typename RightDataType::FieldType;
+                using ResultFieldType = typename ResultDataType::FieldType;
+                using LeftNativeType = NativeType<LeftFieldType>;
+                using RightNativeType = NativeType<RightFieldType>;
+                using ResultNativeType = NativeType<ResultFieldType>;
 
-                /// left_type, right_type and result_type are all decimal types: Decimal32, Decimal64, Decimal128, Decimal256
-                auto & b = static_cast<llvm::IRBuilder<> &>(builder);
-                auto * lval = nativeCast(b, arguments[0], result_type);
-                auto * rval = nativeCast(b, arguments[1], result_type);
-                result = OpSpec::compile(b, lval, rval, std::is_signed_v<typename ResultDataType::FieldType>);
+                size_t max_scale = SparkDecimalBinaryOperation<Operation, mode>::getMaxScaled(
+                    left_type.getScale(), right_type.getScale(), result_type.getScale());
+                auto p1 = left_type.getPrecision();
+                auto p2 = right_type.getPrecision();
+                bool calculate_with_256 = false;
+                if (DataTypeDecimal<LeftFieldType>::maxPrecision() < p1 + max_scale - left_type.getScale()
+                    || DataTypeDecimal<RightFieldType>::maxPrecision() < p2 + max_scale - right_type.getScale())
+                    calculate_with_256 = true;
+
+                if (SparkDecimalBinaryOperation<Operation, mode>::shouldPromoteTo256(left_type, right_type, result_type)
+                    || (is_division && max_scale - left_type.getScale() + max_scale > ResultDataType::maxPrecision()) || calculate_with_256)
+                    nullable_result = compileHelper<Int256>(builder, arguments, left_type, right_type, result_type);
+                else if (is_division)
+                    nullable_result = compileHelper<Int128>(builder, arguments, left_type, right_type, result_type);
+                else
+                    nullable_result = compileHelper<ResultNativeType>(builder, arguments, left_type, right_type, result_type);
+
                 return true;
             });
 
-        return result;
-        */
-        return nullptr;
+        return nullable_result;
+    }
+
+    template <typename CalculateType, typename LeftDataType, typename RightDataType, typename ResultDataType>
+    static llvm::Value * compileHelper(
+        llvm::IRBuilderBase & builder,
+        const ValuesWithType & arguments,
+        const LeftDataType & left_type,
+        const RightDataType & right_type,
+        const ResultDataType & result_type)
+    {
+        auto & b = static_cast<llvm::IRBuilder<> &>(builder);
+        DataTypePtr calculate_type = std::make_shared<DataTypeNumber<CalculateType>>();
+
+        auto * left = nativeCast(b, arguments[0], calculate_type);
+        auto * right = nativeCast(b, arguments[1], calculate_type);
+
+        size_t max_scale = SparkDecimalBinaryOperation<Operation, mode>::getMaxScaled(
+            left_type.getScale(), right_type.getScale(), result_type.getScale());
+        CalculateType scale_left = [&]
+        {
+            if constexpr (is_multiply)
+                return CalculateType{1};
+
+            auto diff = max_scale - left_type.getScale();
+            if constexpr (is_division)
+                return DecimalUtils::scaleMultiplier<CalculateType>(diff + max_scale);
+            else
+                return DecimalUtils::scaleMultiplier<CalculateType>(diff);
+        }();
+
+        CalculateType scale_right = [&]
+        {
+            if constexpr (is_multiply)
+                return CalculateType{1};
+            else
+                return DecimalUtils::scaleMultiplier<CalculateType>(max_scale - right_type.getScale());
+        }();
+
+        auto * scaled_left = b.CreateMul(left, getNativeConstant(b, scale_left));
+        auto * scaled_right = b.CreateMul(right, getNativeConstant(b, scale_right));
+
+        llvm::Value * scaled_result = nullptr;
+        llvm::Value * is_null = llvm::ConstantInt::getFalse(b.getContext());
+        if constexpr (is_plus)
+            scaled_result = b.CreateAdd(scaled_left, scaled_right);
+        else if constexpr (is_minus)
+            scaled_result = b.CreateSub(scaled_left, scaled_right);
+        else if constexpr (is_multiply)
+            scaled_result = b.CreateMul(scaled_left, scaled_right);
+        else if constexpr (is_division)
+        {
+            auto * zero = getNativeConstant(b, static_cast<CalculateType>(0));
+            auto * is_zero = b.CreateICmpEQ(scaled_right, zero);
+
+            auto * scaled_result = b.CreateSDiv(scaled_left, scaled_right);
+            is_null = is_zero;
+        }
+        else if constexpr (is_modulo)
+        {
+            auto * zero = getNativeConstant(b, static_cast<CalculateType>(0));
+            auto * is_zero = b.CreateICmpEQ(scaled_right, zero);
+
+            scaled_result = b.CreateSRem(scaled_left, scaled_right);
+            is_null = is_zero;
+        }
+
+        auto result_scale = result_type.getScale();
+        auto scale_diff = max_scale - result_scale;
+        auto * unscaled_result = scaled_result;
+        if (scale_diff)
+        {
+            auto scaled_diff = DecimalUtils::scaleMultiplier<CalculateType>(scale_diff);
+            unscaled_result = b.CreateSDiv(scaled_result, getNativeConstant(b, scaled_diff));
+        }
+
+        /// check overflow
+        if constexpr (std::is_same_v<CalculateType, Int256> || is_division)
+        {
+            auto max_value = intExp10OfSize<CalculateType>(result_type.getPrecision());
+            auto * max_value_const = getNativeConstant(b, max_value);
+            auto * is_overflow = b.CreateOr(
+                b.CreateICmpSGE(unscaled_result, max_value_const), b.CreateICmpSLE(unscaled_result, b.CreateNeg(max_value_const)));
+            auto * overflow_result = getNativeConstant(b, static_cast<CalculateType>(0));
+            is_null = b.CreateOr(is_null, is_overflow);
+        }
+
+        auto * result = nativeCast(b, calculate_type, unscaled_result, result_type.getPtr());
+        auto * nullable_type = toNativeType(b, makeNullable(result_type.getPtr()));
+        auto * nullable_result = llvm::Constant::getNullValue(nullable_type);
+        auto * nullablel_result_with_value = b.CreateInsertValue(nullable_result, result, {0});
+        return b.CreateInsertValue(nullablel_result_with_value, is_null, {1});
+    }
+
+    template <is_integer T>
+    static llvm::Constant * getNativeConstant(llvm::IRBuilderBase & builder, T element)
+    {
+        auto * type = llvm::Type::getIntNTy(builder.getContext(), sizeof(T) * 8);
+        if constexpr (std::is_integral_v<T>)
+        {
+            return llvm::ConstantInt::get(type, static_cast<uint64_t>(element), true);
+        }
+        else
+        {
+            llvm::APInt value(type->getIntegerBitWidth(), element.items);
+            return llvm::ConstantInt::get(type, value);
+        }
     }
 #endif // USE_EMBEDDED_COMPILER
 
