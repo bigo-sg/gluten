@@ -502,21 +502,21 @@ public:
     bool useDefaultImplementationForConstants() const override { return true; }
     ColumnNumbers getArgumentsThatAreAlwaysConstant() const override { return {2}; }
 
-    DataTypePtr getReturnTypeImpl(const ColumnsWithTypeAndName & arguments) const override
+    DataTypePtr getReturnTypeImpl(const DataTypes & arguments) const override
     {
         if (arguments.size() != 3)
             throw Exception(ErrorCodes::NUMBER_OF_ARGUMENTS_DOESNT_MATCH, "Function '{}' expects 3 arguments", getName());
 
-        if (!isDecimal(arguments[0].type) || !isDecimal(arguments[1].type) || !isDecimal(arguments[2].type))
+        if (!isDecimal(arguments[0]) || !isDecimal(arguments[1]) || !isDecimal(arguments[2]))
             throw Exception(
                 ErrorCodes::ILLEGAL_TYPE_OF_ARGUMENT,
                 "Illegal type {} {} {} of argument of function {}",
-                arguments[0].type->getName(),
-                arguments[1].type->getName(),
-                arguments[2].type->getName(),
+                arguments[0]->getName(),
+                arguments[1]->getName(),
+                arguments[2]->getName(),
                 getName());
 
-        return makeNullable(arguments[2].type);
+        return makeNullable(arguments[2]);
     }
 
     // executeImpl2
@@ -564,8 +564,6 @@ public:
     llvm::Value *
     compileImpl(llvm::IRBuilderBase & builder, const ValuesWithType & arguments, const DataTypePtr & result_type) const override
     {
-        assert(3 == arguments.size());
-
         const auto & denull_left_type = arguments[0].type;
         const auto & denull_right_type = arguments[1].type;
         const auto & denull_result_type = removeNullable(result_type);
@@ -662,7 +660,7 @@ public:
             auto * zero = getNativeConstant(b, static_cast<CalculateType>(0));
             auto * is_zero = b.CreateICmpEQ(scaled_right, zero);
 
-            auto * scaled_result = b.CreateSDiv(scaled_left, scaled_right);
+            scaled_result = b.CreateSDiv(scaled_left, scaled_right);
             is_null = is_zero;
         }
         else if constexpr (is_modulo)
