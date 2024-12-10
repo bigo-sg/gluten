@@ -557,7 +557,9 @@ public:
     }
 
 #if USE_EMBEDDED_COMPILER
-    bool isCompilableImpl(const DataTypes & /*arguments*/, const DataTypePtr & /*result_type*/) const override { return false; }
+    virtual ColumnNumbers getArgumentsThatDontParticipateInCompilation(const DataTypes & /*types*/) const { return {2}; }
+
+    bool isCompilableImpl(const DataTypes & /*arguments*/, const DataTypePtr & /*result_type*/) const override { return true; }
 
     llvm::Value *
     compileImpl(llvm::IRBuilderBase & builder, const ValuesWithType & arguments, const DataTypePtr & result_type) const override
