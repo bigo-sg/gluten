@@ -34,7 +34,7 @@ import scala.collection.mutable
 class GlutenClickHouseTPCHBucketSuite
   extends GlutenClickHouseTPCHAbstractSuite
   with AdaptiveSparkPlanHelper {
-
+  val runtimeConfigPrefix = "spark.gluten.sql.columnar.backend.ch.runtime_config."
   override protected val tablesPath: String = basePath + "/tpch-data-ch"
   override protected val tpchQueries: String = rootPath + "queries/tpch-queries-ch"
   override protected val queriesResults: String = rootPath + "bucket-queries-output"
@@ -48,6 +48,7 @@ class GlutenClickHouseTPCHBucketSuite
       .set("spark.sql.autoBroadcastJoinThreshold", "-1") // for test bucket join
       .set("spark.sql.adaptive.enabled", "true")
       .set("spark.gluten.sql.columnar.backend.ch.shuffle.hash.algorithm", "sparkMurmurHash3_32")
+      .set(runtimeConfigPrefix + "enable_pre_projection_for_join_conditions", "false")
       .setCHConfig("enable_grace_aggregate_spill_test", "true")
   }
 

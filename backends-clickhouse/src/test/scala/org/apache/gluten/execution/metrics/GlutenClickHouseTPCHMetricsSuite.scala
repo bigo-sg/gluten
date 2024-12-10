@@ -29,6 +29,7 @@ import org.apache.spark.task.TaskResources
 import scala.collection.JavaConverters._
 
 class GlutenClickHouseTPCHMetricsSuite extends GlutenClickHouseTPCHAbstractSuite {
+  val runtimeConfigPrefix = "spark.gluten.sql.columnar.backend.ch.runtime_config."
   private val parquetMaxBlockSize = 4096
   override protected val needCopyParquetToTablePath = true
 
@@ -51,6 +52,7 @@ class GlutenClickHouseTPCHMetricsSuite extends GlutenClickHouseTPCHAbstractSuite
       .set("spark.sql.autoBroadcastJoinThreshold", "10MB")
       .setCHConfig("logger.level", "error")
       .setCHSettings("input_format_parquet_max_block_size", parquetMaxBlockSize)
+      .set(runtimeConfigPrefix + "enable_pre_projection_for_join_conditions", "false")
       .setCHConfig("enable_streaming_aggregating", true)
   }
   // scalastyle:on line.size.limit
