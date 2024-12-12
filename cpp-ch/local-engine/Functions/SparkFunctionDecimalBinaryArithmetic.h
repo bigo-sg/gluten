@@ -18,25 +18,41 @@
 
 #include <base/arithmeticOverflow.h>
 
+
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wbit-int-extension"
+using NewInt128 = signed _BitInt(128);
+using NewUInt128 = unsigned _BitInt(128);
+using NewInt256 = signed _BitInt(256);
+using NewUInt256 = unsigned _BitInt(256);
+
+
+
 namespace local_engine
 {
 
 static bool canCastLower(const Int256 & a, const Int256 & b)
 {
-    if (a.items[2] == 0 && a.items[3] == 0 && b.items[2] == 0 && b.items[3] == 0)
-        return true;
-
-    return false;
+    return a.items[2] == 0 && a.items[3] == 0 && b.items[2] == 0 && b.items[3] == 0;
 }
 
 static bool canCastLower(const Int128 & a, const Int128 & b)
 {
-    if (a.items[1] == 0 && b.items[1] == 0)
-        return true;
-
-    return false;
+    return a.items[1] == 0 && b.items[1] == 0;
 }
 
+static const Int256 & toInt256(const NewInt256 & value)
+{
+    return *reinterpret_cast<const Int256 *>(&value);
+}
+
+static const NewInt256 & toNewInt256(const Int256 & value)
+{
+    return *reinterpret_cast<const NewInt256 *>(&value);
+}
+
+/// TODO(taiyang-li): remove all overflow checking in below codes because we have already checked overflow in SparkDecimalBinaryOperation
 struct DecimalPlusImpl
 {
     template <typename T>
@@ -72,7 +88,10 @@ struct DecimalPlusImpl
             r = static_cast<Int256>(low_result);
             return true;
         }
-        return !common::addOverflow(a, b, r);
+
+        // return !common::addOverflow(a, b, r);
+        r = toInt256(toNewInt256(a) + toNewInt256(b));
+        return true;
     }
 
 #if USE_EMBEDDED_COMPILER
@@ -123,8 +142,11 @@ struct DecimalMinusImpl
             return true;
         }
 
-        return !common::subOverflow(a, b, r);
+        // return !common::subOverflow(a, b, r);
+        r = toInt256(toNewInt256(a) - toNewInt256(b));
+        return true;
     }
+
 
 #if USE_EMBEDDED_COMPILER
     static constexpr bool compilable = true;
@@ -160,6 +182,13 @@ struct DecimalMultiplyImpl
         }
 
         return !common::mulOverflow(a, b, r);
+    }
+
+    template <>
+    static bool apply(Int256 a, Int256 b, Int256 & r)
+    {
+        r = toInt256(toNewInt256(a) * toNewInt256(b));
+        return true;
     }
 
 #if USE_EMBEDDED_COMPILER
@@ -216,7 +245,8 @@ struct DecimalDivideImpl
             return true;
         }
 
-        r = a / b;
+        // r = a / b;
+        r = toInt256(toNewInt256(a) / toNewInt256(b));
         return true;
     }
 

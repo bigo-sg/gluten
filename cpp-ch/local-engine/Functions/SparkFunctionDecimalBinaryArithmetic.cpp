@@ -559,7 +559,42 @@ public:
 #if USE_EMBEDDED_COMPILER
     virtual ColumnNumbers getArgumentsThatDontParticipateInCompilation(const DataTypes & /*types*/) const { return {2}; }
 
-    bool isCompilableImpl(const DataTypes & /*arguments*/, const DataTypePtr & /*result_type*/) const override { return true; }
+    bool isCompilableImpl(const DataTypes & arguments, const DataTypePtr & result_type) const override
+    {
+        const auto & denull_left_type = arguments[0];
+        const auto & denull_right_type = arguments[1];
+        const auto & denull_result_type = removeNullable(result_type);
+        if (!canBeNativeType(denull_left_type) || !canBeNativeType(denull_right_type) || !canBeNativeType(denull_result_type))
+            return false;
+
+        return castTripleTypes(
+            denull_left_type.get(),
+            denull_right_type.get(),
+            denull_result_type.get(),
+            [&](const auto & left_type, const auto & right_type, const auto & result_type)
+            {
+                using LeftDataType = std::decay_t<decltype(left_type)>;
+                using RightDataType = std::decay_t<decltype(right_type)>;
+                using ResultDataType = std::decay_t<decltype(result_type)>;
+                using LeftFieldType = typename LeftDataType::FieldType;
+                using RightFieldType = typename RightDataType::FieldType;
+                using ResultFieldType = typename ResultDataType::FieldType;
+
+                size_t max_scale = SparkDecimalBinaryOperation<Operation, mode>::getMaxScaled(
+                    left_type.getScale(), right_type.getScale(), result_type.getScale());
+                auto p1 = left_type.getPrecision();
+                auto p2 = right_type.getPrecision();
+                if (DataTypeDecimal<LeftFieldType>::maxPrecision() < p1 + max_scale - left_type.getScale()
+                    || DataTypeDecimal<RightFieldType>::maxPrecision() < p2 + max_scale - right_type.getScale())
+                    return false;
+
+                if (SparkDecimalBinaryOperation<Operation, mode>::shouldPromoteTo256(left_type, right_type, result_type)
+                    || (is_division && max_scale - left_type.getScale() + max_scale > ResultDataType::maxPrecision()))
+                    return false;
+
+                return true;
+            });
+    }
 
     llvm::Value *
     compileImpl(llvm::IRBuilderBase & builder, const ValuesWithType & arguments, const DataTypePtr & result_type) const override
@@ -597,6 +632,7 @@ public:
                 if (SparkDecimalBinaryOperation<Operation, mode>::shouldPromoteTo256(left_type, right_type, result_type)
                     || (is_division && max_scale - left_type.getScale() + max_scale > ResultDataType::maxPrecision()) || calculate_with_256)
                     nullable_result = compileHelper<Int256>(builder, arguments, left_type, right_type, result_type);
+                    // nullable_result = compileHelper<Int128>(builder, arguments, left_type, right_type, result_type);
                 else if (is_division)
                     nullable_result = compileHelper<Int128>(builder, arguments, left_type, right_type, result_type);
                 else
@@ -616,14 +652,20 @@ public:
         const RightDataType & right_type,
         const ResultDataType & result_type)
     {
+        // std::cout << "left_type:" << left_type.getName() << " right_type:" << right_type.getName()
+                //   << " result_type:" << result_type.getName() << std::endl;
+
         auto & b = static_cast<llvm::IRBuilder<> &>(builder);
         DataTypePtr calculate_type = std::make_shared<DataTypeNumber<CalculateType>>();
+        // std::cout << "calculate_type_bytes:" << sizeof(calculate_type) << std::endl;
 
         auto * left = nativeCast(b, arguments[0], calculate_type);
         auto * right = nativeCast(b, arguments[1], calculate_type);
 
         size_t max_scale = SparkDecimalBinaryOperation<Operation, mode>::getMaxScaled(
             left_type.getScale(), right_type.getScale(), result_type.getScale());
+        // std::cout << "max_scale:" << max_scale << std::endl;
+
         CalculateType scale_left = [&]
         {
             if constexpr (is_multiply)
@@ -635,6 +677,7 @@ public:
             else
                 return DecimalUtils::scaleMultiplier<CalculateType>(diff);
         }();
+        // std::cout << "scale_left:" << toString(Field{scale_left}) << std::endl;
 
         CalculateType scale_right = [&]
         {
@@ -643,6 +686,7 @@ public:
             else
                 return DecimalUtils::scaleMultiplier<CalculateType>(max_scale - right_type.getScale());
         }();
+        // std::cout << "scale_right:" << toString(Field{scale_right}) << std::endl;
 
         auto * scaled_left = b.CreateMul(left, getNativeConstant(b, scale_left));
         auto * scaled_right = b.CreateMul(right, getNativeConstant(b, scale_right));
@@ -674,6 +718,7 @@ public:
 
         auto result_scale = result_type.getScale();
         auto scale_diff = max_scale - result_scale;
+        // std::cout << "result_scale:" << result_scale << " scale_diff:" << scale_diff << std::endl;
         auto * unscaled_result = scaled_result;
         if (scale_diff)
         {
