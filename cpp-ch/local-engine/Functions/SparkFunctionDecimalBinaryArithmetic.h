@@ -58,7 +58,8 @@ struct DecimalPlusImpl
     template <typename T>
     static bool apply(T a, T b, T & r)
     {
-        return !common::addOverflow(a, b, r);
+        r = a + b;
+        return true;
     }
 
     template <>
@@ -66,14 +67,16 @@ struct DecimalPlusImpl
     {
         if (canCastLower(a, b))
         {
-            UInt64 low_result;
-            if (common::addOverflow(static_cast<UInt64>(a), static_cast<UInt64>(b), low_result))
-                return !common::addOverflow(a, b, r);
-
-            r = static_cast<Int128>(low_result);
-            return true;
+            Int64 low_result;
+            if (!common::addOverflow(static_cast<Int64>(a), static_cast<Int64>(b), low_result))
+            {
+                r = static_cast<Int128>(low_result);
+                return true;
+            }
         }
-        return !common::addOverflow(a, b, r);
+
+        r = a + b;
+        return true;
     }
 
     template <>
@@ -81,17 +84,16 @@ struct DecimalPlusImpl
     {
         if (canCastLower(a, b))
         {
-            UInt128 low_result;
-            if (common::addOverflow(static_cast<UInt128>(a), static_cast<UInt128>(b), low_result))
-                return !common::addOverflow(a, b, r);
-
-            r = static_cast<Int256>(low_result);
-            return true;
+            Int128 low_result;
+            if (!common::addOverflow(static_cast<Int128>(a), static_cast<Int128>(b), low_result))
+            {
+                r = static_cast<Int256>(low_result);
+                return true;
+            }
         }
 
-        return !common::addOverflow(a, b, r);
-        // r = toInt256(toNewInt256(a) + toNewInt256(b));
-        // return true;
+        r = toInt256(toNewInt256(a) + toNewInt256(b));
+        return true;
     }
 
 #if USE_EMBEDDED_COMPILER
@@ -110,7 +112,8 @@ struct DecimalMinusImpl
     template <typename T>
     static bool apply(T a, T b, T & r)
     {
-        return !common::subOverflow(a, b, r);
+        r = a - b;
+        return true;
     }
 
     template <>
@@ -118,15 +121,16 @@ struct DecimalMinusImpl
     {
         if (canCastLower(a, b))
         {
-            UInt64 low_result;
-            if (common::subOverflow(static_cast<UInt64>(a), static_cast<UInt64>(b), low_result))
-                return !common::subOverflow(a, b, r);
-
-            r = static_cast<Int128>(low_result);
-            return true;
+            Int64 low_result;
+            if (!common::subOverflow(static_cast<Int64>(a), static_cast<Int64>(b), low_result))
+            {
+                r = static_cast<Int128>(low_result);
+                return true;
+            }
         }
 
-        return !common::subOverflow(a, b, r);
+        r = a - b;
+        return true;
     }
 
     template <>
@@ -134,17 +138,16 @@ struct DecimalMinusImpl
     {
         if (canCastLower(a, b))
         {
-            UInt128 low_result;
-            if (common::subOverflow(static_cast<UInt128>(a), static_cast<UInt128>(b), low_result))
-                return !common::subOverflow(a, b, r);
-
-            r = static_cast<Int256>(low_result);
-            return true;
+            Int128 low_result;
+            if (!common::subOverflow(static_cast<Int128>(a), static_cast<Int128>(b), low_result))
+            {
+                r = static_cast<Int256>(low_result);
+                return true;
+            }
         }
 
-        return !common::subOverflow(a, b, r);
-        // r = toInt256(toNewInt256(a) - toNewInt256(b));
-        // return true;
+        r = toInt256(toNewInt256(a) - toNewInt256(b));
+        return true;
     }
 
 
@@ -165,7 +168,8 @@ struct DecimalMultiplyImpl
     template <typename T>
     static bool apply(T a, T b, T & c)
     {
-        return !common::mulOverflow(a, b, c);
+        c = a * b;
+        return true;
     }
 
     template <Int128>
@@ -173,22 +177,32 @@ struct DecimalMultiplyImpl
     {
         if (canCastLower(a, b))
         {
-            UInt64 low_result = 0;
-            if (common::mulOverflow(static_cast<UInt64>(a), static_cast<UInt64>(b), low_result))
-                return !common::mulOverflow(a, b, r);
-
-            r = static_cast<Int128>(low_result);
-            return true;
+            Int64 low_result = 0;
+            if (!common::mulOverflow(static_cast<Int64>(a), static_cast<Int64>(b), low_result))
+            {
+                r = static_cast<Int128>(low_result);
+                return true;
+            }
         }
 
-        return !common::mulOverflow(a, b, r);
+        r = a * b;
+        return true;
     }
 
     template <>
     static bool apply(Int256 a, Int256 b, Int256 & r)
     {
-        // r = toInt256(toNewInt256(a) * toNewInt256(b));
-        r = a * b;
+        if (canCastLower(a, b))
+        {
+            Int128 low_result = 0;
+            if (!common::mulOverflow(static_cast<Int128>(a), static_cast<Int128>(b), low_result))
+            {
+                r = static_cast<Int256>(low_result);
+                return true;
+            }
+        }
+
+        r = toInt256(toNewInt256(a) * toNewInt256(b));
         return true;
     }
 
@@ -222,7 +236,7 @@ struct DecimalDivideImpl
 
         if (canCastLower(a, b))
         {
-            r = static_cast<Int128>(static_cast<UInt64>(a) / static_cast<UInt64>(b));
+            r = static_cast<Int128>(static_cast<Int64>(a) / static_cast<Int64>(b));
             return true;
         }
 
@@ -238,16 +252,11 @@ struct DecimalDivideImpl
 
         if (canCastLower(a, b))
         {
-            UInt128 low_result = 0;
-            UInt128 low_a = static_cast<UInt128>(a);
-            UInt128 low_b = static_cast<UInt128>(b);
-            apply(low_a, low_b, low_result);
-            r = static_cast<Int256>(low_result);
+            r = static_cast<Int256>(static_cast<Int128>(a) / static_cast<Int128>(b));
             return true;
         }
 
-        r = a / b;
-        // r = toInt256(toNewInt256(a) / toNewInt256(b));
+        r = toInt256(toNewInt256(a) / toNewInt256(b));
         return true;
     }
 
@@ -272,6 +281,39 @@ struct DecimalModuloImpl
             return false;
 
         r = a % b;
+        return true;
+    }
+
+    template <>
+    static bool apply(Int128 a, Int128 b, Int128 & r)
+    {
+        if (b == 0)
+            return false;
+
+        if (canCastLower(a, b))
+        {
+            r = static_cast<Int128>(static_cast<Int64>(a) % static_cast<Int64>(b));
+            return true;
+        }
+
+        r = a % b;
+        return true;
+    }
+
+
+    template <>
+    static bool apply(Int256 a, Int256 b, Int256 & r)
+    {
+        if (b == 0)
+            return false;
+
+        if (canCastLower(a, b))
+        {
+            r = static_cast<Int256>(static_cast<Int128>(a) % static_cast<Int128>(b));
+            return true;
+        }
+
+        r = toInt256(toNewInt256(a) % toNewInt256(b));
         return true;
     }
 
