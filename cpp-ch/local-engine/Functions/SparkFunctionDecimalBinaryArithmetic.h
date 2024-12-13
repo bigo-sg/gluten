@@ -89,9 +89,9 @@ struct DecimalPlusImpl
             return true;
         }
 
-        // return !common::addOverflow(a, b, r);
-        r = toInt256(toNewInt256(a) + toNewInt256(b));
-        return true;
+        return !common::addOverflow(a, b, r);
+        // r = toInt256(toNewInt256(a) + toNewInt256(b));
+        // return true;
     }
 
 #if USE_EMBEDDED_COMPILER
@@ -142,9 +142,9 @@ struct DecimalMinusImpl
             return true;
         }
 
-        // return !common::subOverflow(a, b, r);
-        r = toInt256(toNewInt256(a) - toNewInt256(b));
-        return true;
+        return !common::subOverflow(a, b, r);
+        // r = toInt256(toNewInt256(a) - toNewInt256(b));
+        // return true;
     }
 
 
@@ -187,7 +187,8 @@ struct DecimalMultiplyImpl
     template <>
     static bool apply(Int256 a, Int256 b, Int256 & r)
     {
-        r = toInt256(toNewInt256(a) * toNewInt256(b));
+        // r = toInt256(toNewInt256(a) * toNewInt256(b));
+        r = a * b;
         return true;
     }
 
@@ -245,8 +246,8 @@ struct DecimalDivideImpl
             return true;
         }
 
-        // r = a / b;
-        r = toInt256(toNewInt256(a) / toNewInt256(b));
+        r = a / b;
+        // r = toInt256(toNewInt256(a) / toNewInt256(b));
         return true;
     }
 
