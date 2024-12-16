@@ -469,12 +469,11 @@ private:
     }
 
     template <typename T>
-    static T applyScaled(T n, T scale)
+    static ALWAYS_INLINE T applyScaled(T n, T scale)
     {
-        if (scale > 1)
-            return common::mulIgnoreOverflow(n, scale);
-
-        return n;
+        T res;
+        DecimalMultiplyImpl::apply(n, std::max<T>(scale, 1), res);
+        return res;
     }
 };
 
