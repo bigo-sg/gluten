@@ -32,6 +32,7 @@
 #if USE_EMBEDDED_COMPILER
 #include <llvm/IR/IRBuilder.h>
 #include <DataTypes/Native.h>
+#include <iostream>
 #endif
 
 namespace DB
@@ -443,7 +444,8 @@ private:
         if (scale_diff)
         {
             auto scaled_diff = DecimalUtils::scaleMultiplier<CalculateType>(scale_diff);
-            DecimalDivideImpl::apply<CalculateType>(c_res, scaled_diff, c_res);
+            c_res = applyUnscaled(c_res, scaled_diff);
+            // DecimalDivideImpl::apply<CalculateType>(c_res, scaled_diff, c_res);
         }
 
         // check overflow
@@ -468,13 +470,31 @@ private:
             return elem[i].value;
     }
 
+
     template <typename T>
     static ALWAYS_INLINE T applyScaled(T n, T scale)
     {
-        T res;
-        DecimalMultiplyImpl::apply(n, std::max<T>(scale, 1), res);
-        return res;
+        return n * scale;
     }
+
+    template <>
+    static ALWAYS_INLINE Int256 applyScaled(Int256 n, Int256 scale)
+    {
+        return toInt256(toNewInt256(n) * toNewInt256(scale));
+    }
+
+    template <typename T>
+    static ALWAYS_INLINE T applyUnscaled(T n, T scale)
+    {
+        return n / scale;
+    }
+
+    template <>
+    static ALWAYS_INLINE Int256 applyUnscaled(Int256 n, Int256 scale)
+    {
+        return toInt256(toNewInt256(n) / toNewInt256(scale));
+    }
+
 };
 
 /// TODO(taiyang-li): implement JIT for binary deicmal arithmetic functions

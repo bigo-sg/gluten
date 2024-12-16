@@ -172,7 +172,7 @@ struct DecimalMultiplyImpl
         return true;
     }
 
-    template <Int128>
+    template <>
     static bool apply(Int128 a, Int128 b, Int128 & r)
     {
         if (canCastLower(a, b))
