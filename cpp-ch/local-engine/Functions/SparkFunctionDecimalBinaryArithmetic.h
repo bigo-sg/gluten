@@ -199,17 +199,7 @@ struct DecimalMultiplyImpl
     template <>
     static bool apply(Int256 a, Int256 b, Int256 & r)
     {
-        if (canCastLower(a, b))
-        {
-            UInt128 low_result = 0;
-            if (!common::mulOverflow(static_cast<UInt128>(a), static_cast<UInt128>(b), low_result))
-            {
-                r = static_cast<Int256>(low_result);
-                assert(r == a * b);
-                return true;
-            }
-        }
-
+        /// Notice that we can't use common::mulOverflow here because it doesn't support checking overflow on Int128 multiplication.
         r = toInt256(toNewInt256(a) * toNewInt256(b));
         assert(r == a * b);
         return true;
