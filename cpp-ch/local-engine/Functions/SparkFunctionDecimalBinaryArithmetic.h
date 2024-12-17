@@ -71,7 +71,7 @@ struct DecimalPlusImpl
             if (!common::addOverflow(static_cast<UInt64>(a), static_cast<UInt64>(b), low_result))
             {
                 r = static_cast<Int128>(low_result);
-                assert(r == a + b);
+                chassert(r == a + b);
                 return true;
             }
         }
@@ -89,13 +89,13 @@ struct DecimalPlusImpl
             if (!common::addOverflow(static_cast<UInt128>(a), static_cast<UInt128>(b), low_result))
             {
                 r = static_cast<Int256>(low_result);
-                assert(r == a + b);
+                chassert(r == a + b);
                 return true;
             }
         }
 
         r = toInt256(toNewInt256(a) + toNewInt256(b));
-        assert(r == a + b);
+        chassert(r == a + b);
         return true;
     }
 
@@ -128,7 +128,7 @@ struct DecimalMinusImpl
             if (!common::subOverflow(static_cast<Int64>(a), static_cast<Int64>(b), low_result))
             {
                 r = static_cast<Int128>(low_result);
-                assert(r == a - b);
+                chassert(r == a - b);
                 return true;
             }
         }
@@ -146,13 +146,13 @@ struct DecimalMinusImpl
             if (!common::subOverflow(static_cast<Int128>(a), static_cast<Int128>(b), low_result))
             {
                 r = static_cast<Int256>(low_result);
-                assert(r == a - b);
+                chassert(r == a - b);
                 return true;
             }
         }
 
         r = toInt256(toNewInt256(a) - toNewInt256(b));
-        assert(r == a - b);
+        chassert(r == a - b);
         return true;
     }
 
@@ -187,7 +187,7 @@ struct DecimalMultiplyImpl
             if (!common::mulOverflow(static_cast<UInt64>(a), static_cast<UInt64>(b), low_result))
             {
                 r = static_cast<Int128>(low_result);
-                assert(r == a * b);
+                chassert(r == a * b);
                 return true;
             }
         }
@@ -201,7 +201,7 @@ struct DecimalMultiplyImpl
     {
         /// Notice that we can't use common::mulOverflow here because it doesn't support checking overflow on Int128 multiplication.
         r = toInt256(toNewInt256(a) * toNewInt256(b));
-        assert(r == a * b);
+        chassert(r == a * b);
         return true;
     }
 
@@ -237,7 +237,7 @@ struct DecimalDivideImpl
         {
             /// We must cast to UInt64 to avoid overflow in the division.
             r = static_cast<Int128>(static_cast<UInt64>(a) / static_cast<UInt64>(b));
-            assert(r == a / b);
+            chassert(r == a / b);
             return true;
         }
 
@@ -255,12 +255,12 @@ struct DecimalDivideImpl
         {
             /// We must cast to UInt128 to avoid overflow in the division.
             r = static_cast<Int256>(static_cast<UInt128>(a) / static_cast<UInt128>(b));
-            assert(r == a / b);
+            chassert(r == a / b);
             return true;
         }
 
         r = toInt256(toNewInt256(a) / toNewInt256(b));
-        assert(r == a / b);
+        chassert(r == a / b);
         return true;
     }
 
@@ -298,7 +298,7 @@ struct DecimalModuloImpl
         {
             /// We must cast to UInt64 to avoid overflow in the division.
             r = static_cast<Int128>(static_cast<UInt64>(a) % static_cast<UInt64>(b));
-            assert(r == a % b);
+            chassert(r == a % b);
             return true;
         }
 
@@ -317,12 +317,12 @@ struct DecimalModuloImpl
         {
             /// We must cast to UInt128 to avoid overflow in the division.
             r = static_cast<Int256>(static_cast<UInt128>(a) % static_cast<UInt128>(b));
-            assert(r == a % b);
+            chassert(r == a % b);
             return true;
         }
 
         r = toInt256(toNewInt256(a) % toNewInt256(b));
-        assert(r == a % b);
+        chassert(r == a % b);
         return true;
     }
 
