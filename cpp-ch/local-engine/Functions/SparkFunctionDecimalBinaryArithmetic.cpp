@@ -343,7 +343,7 @@ private:
     template <
         typename ScaledNativeType,
         typename ResultNativeType>
-    static NO_SANITIZE_UNDEFINED bool calculate(
+    static ALWAYS_INLINE bool calculate(
         const ScaledNativeType & left,
         const ScaledNativeType & right,
         const ScaledNativeType & scale_left,
@@ -352,15 +352,17 @@ private:
         const ScaledNativeType & max_value,
         ResultNativeType & res)
     {
-        auto scaled_left = applyScaled(left, scale_left);
-        auto scaled_right = applyScaled(right, scale_right);
+        auto scaled_left = scale_left > 1 ? applyScaled(left, scale_left) : left;
+        auto scaled_right = scale_right > 1 ? applyScaled(right, scale_right) : right;
 
         ScaledNativeType c_res = 0;
         auto success = Operation::template apply(scaled_left, scaled_right, c_res);
         if (!success)
             return false;
 
-        c_res = applyUnscaled(c_res, unscale_result);
+        if (unscale_result > 1)
+            c_res = applyUnscaled(c_res, unscale_result);
+
         res = static_cast<ResultNativeType>(c_res);
 
         if constexpr (std::is_same_v<ScaledNativeType, Int256> || is_division)
