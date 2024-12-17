@@ -362,7 +362,7 @@ private:
                 if (calculate<calculate_with_256>(
                         scaled_left,
                         static_cast<ScaledNativeType>(unwrap<op_case == OpCase::RightConstant>(right_data, i)),
-                        static_cast<ScaledNativeType>(0),
+                        static_cast<ScaledNativeType>(1),
                         scale_right,
                         max_scale,
                         result_type,
@@ -384,7 +384,7 @@ private:
                         static_cast<ScaledNativeType>(unwrap<op_case == OpCase::LeftConstant>(left_data, i)),
                         scaled_right,
                         scale_left,
-                        static_cast<ScaledNativeType>(0),
+                        static_cast<ScaledNativeType>(1),
                         max_scale,
                         result_type,
                         res))
@@ -474,13 +474,22 @@ private:
     template <typename T>
     static ALWAYS_INLINE T applyScaled(T n, T scale)
     {
+        assert(scale != 0);
         return n * scale;
+        /*
+        if (scale > 1)
+            return common::mulIgnoreOverflow(n, scale);
+
+        return n;
+        */
     }
 
     template <>
     static ALWAYS_INLINE Int256 applyScaled(Int256 n, Int256 scale)
     {
-        return toInt256(toNewInt256(n) * toNewInt256(scale));
+        Int256 res = toInt256(toNewInt256(n) * toNewInt256(scale));
+        assert(res == n * scale);
+        return res;
     }
 
     template <typename T>
@@ -492,7 +501,9 @@ private:
     template <>
     static ALWAYS_INLINE Int256 applyUnscaled(Int256 n, Int256 scale)
     {
-        return toInt256(toNewInt256(n) / toNewInt256(scale));
+        Int256 res = toInt256(toNewInt256(n) / toNewInt256(scale));
+        assert(res == n / scale);
+        return res;
     }
 
 };
@@ -671,19 +682,14 @@ public:
         const RightDataType & right_type,
         const ResultDataType & result_type)
     {
-        // std::cout << "left_type:" << left_type.getName() << " right_type:" << right_type.getName()
-                //   << " result_type:" << result_type.getName() << std::endl;
-
         auto & b = static_cast<llvm::IRBuilder<> &>(builder);
         DataTypePtr calculate_type = std::make_shared<DataTypeNumber<CalculateType>>();
-        // std::cout << "calculate_type_bytes:" << sizeof(calculate_type) << std::endl;
 
         auto * left = nativeCast(b, arguments[0], calculate_type);
         auto * right = nativeCast(b, arguments[1], calculate_type);
 
         size_t max_scale = SparkDecimalBinaryOperation<Operation, mode>::getMaxScaled(
             left_type.getScale(), right_type.getScale(), result_type.getScale());
-        // std::cout << "max_scale:" << max_scale << std::endl;
 
         CalculateType scale_left = [&]
         {
@@ -696,7 +702,6 @@ public:
             else
                 return DecimalUtils::scaleMultiplier<CalculateType>(diff);
         }();
-        // std::cout << "scale_left:" << toString(Field{scale_left}) << std::endl;
 
         CalculateType scale_right = [&]
         {
@@ -705,7 +710,6 @@ public:
             else
                 return DecimalUtils::scaleMultiplier<CalculateType>(max_scale - right_type.getScale());
         }();
-        // std::cout << "scale_right:" << toString(Field{scale_right}) << std::endl;
 
         auto * scaled_left = b.CreateMul(left, getNativeConstant(b, scale_left));
         auto * scaled_right = b.CreateMul(right, getNativeConstant(b, scale_right));
@@ -737,7 +741,6 @@ public:
 
         auto result_scale = result_type.getScale();
         auto scale_diff = max_scale - result_scale;
-        // std::cout << "result_scale:" << result_scale << " scale_diff:" << scale_diff << std::endl;
         auto * unscaled_result = scaled_result;
         if (scale_diff)
         {
