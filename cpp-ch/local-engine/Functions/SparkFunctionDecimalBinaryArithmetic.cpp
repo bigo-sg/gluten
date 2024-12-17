@@ -476,12 +476,6 @@ private:
     {
         assert(scale != 0);
         return n * scale;
-        /*
-        if (scale > 1)
-            return common::mulIgnoreOverflow(n, scale);
-
-        return n;
-        */
     }
 
     template <>
