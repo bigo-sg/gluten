@@ -42,6 +42,11 @@ static bool canCastLower(const Int128 & a, const Int128 & b)
     return a.items[1] == 0 && b.items[1] == 0;
 }
 
+static bool canCastLower(const UInt128 & a, const UInt128 & b)
+{
+    return a.items[1] == 0 && b.items[1] == 0;
+}
+
 static const Int256 & toInt256(const NewInt256 & value)
 {
     return *reinterpret_cast<const Int256 *>(&value);
@@ -246,6 +251,25 @@ struct DecimalDivideImpl
     }
 
     template <>
+    static bool apply(UInt128 a, UInt128 b, UInt128 & r)
+    {
+        if (b == 0)
+            return false;
+
+        if (canCastLower(a, b))
+        {
+            /// We must cast to UInt64 to avoid overflow in the division.
+            r = static_cast<UInt128>(static_cast<UInt64>(a) / static_cast<UInt64>(b));
+            chassert(r == a / b);
+            return true;
+        }
+
+        r = a / b;
+        return true;
+    }
+
+
+    template <>
     static bool apply(Int256 a, Int256 b, Int256 & r)
     {
         if (b == 0)
@@ -254,7 +278,9 @@ struct DecimalDivideImpl
         if (canCastLower(a, b))
         {
             /// We must cast to UInt128 to avoid overflow in the division.
-            r = static_cast<Int256>(static_cast<UInt128>(a) / static_cast<UInt128>(b));
+            UInt128 low_result;
+            apply(static_cast<UInt128>(a), static_cast<UInt128>(b), low_result);
+            r = static_cast<Int256>(low_result);
             chassert(r == a / b);
             return true;
         }

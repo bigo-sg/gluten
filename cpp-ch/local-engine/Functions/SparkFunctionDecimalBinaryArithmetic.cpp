@@ -386,31 +386,21 @@ private:
     static ALWAYS_INLINE T applyScaled(T n, T scale)
     {
         chassert(scale != 0);
-        return n * scale;
-    }
 
-    template <>
-    static ALWAYS_INLINE Int256 applyScaled(Int256 n, Int256 scale)
-    {
-        Int256 res = toInt256(toNewInt256(n) * toNewInt256(scale));
-        chassert(res == n * scale);
+        T res;
+        DecimalMultiplyImpl::apply(n, scale, res);
         return res;
     }
 
     template <typename T>
     static ALWAYS_INLINE T applyUnscaled(T n, T scale)
     {
-        return n / scale;
-    }
+        chassert(scale != 0);
 
-    template <>
-    static ALWAYS_INLINE Int256 applyUnscaled(Int256 n, Int256 scale)
-    {
-        Int256 res = toInt256(toNewInt256(n) / toNewInt256(scale));
-        chassert(res == n / scale);
+        T res;
+        DecimalDivideImpl::apply(n, scale, res);
         return res;
     }
-
 };
 
 /// TODO(taiyang-li): implement JIT for binary deicmal arithmetic functions
