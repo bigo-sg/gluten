@@ -56,6 +56,7 @@
 
 using namespace local_engine;
 using namespace dbms;
+using namespace DB;
 
 DB::ContextMutablePtr global_context;
 
@@ -893,7 +894,7 @@ BENCHMARK(BM_ParquetRead)->Unit(benchmark::kMillisecond)->Iterations(10);
 
 int main(int argc, char ** argv)
 {
-    std::map<std::string, std::string> empty;
+    SparkConfigs::ConfigMap empty;
     BackendInitializerUtil::initBackend(empty);
     SCOPE_EXIT({ BackendFinalizerUtil::finalizeGlobally(); });
 
