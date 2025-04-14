@@ -32,6 +32,8 @@
     <module>planner</module>
     <module>loader</module>
     <module>runtime</module>
+    <module>loader-bundle</module>
+    <module>ut</module>
   </modules>
 
   <properties>

@@ -47,6 +47,23 @@
       <version>${project.version}</version>
       <scope>runtime</scope>
     </dependency>
+    <dependency>
+    	<!-- Ensures that flink-table-planner is built beforehand, in order to bundle the jar -->
+			<groupId>org.apache.gluten</groupId>
+			<artifactId>gluten-flink-loader-bundle</artifactId>
+			<version>${project.version}</version>
+			<!-- We don't want any production code from flink-table-planner-loader to reference flink-table-planner directly -->
+			<scope>runtime</scope>
+			<!-- Prevent dependency from being accessible to modules depending on flink-table-planner -->
+			<optional>true</optional>
+			<exclusions>
+				<!-- Prevent pekko and scala from being visible to other modules depending on flink-table-planner-loader -->
+				<exclusion>
+					<groupId>*</groupId>
+					<artifactId>*</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
   </dependencies>
 
   <build>
@@ -70,6 +87,14 @@
                   <type>jar</type>
                   <overWrite>true</overWrite>
                   <destFileName>gluten-flink-planner.jar</destFileName>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>org.apache.gluten</groupId>
+                  <artifactId>gluten-flink-loader-bundle</artifactId>
+                  <version>${project.version}</version>
+                  <type>jar</type>
+                  <overWrite>true</overWrite>
+                  <destFileName>flink-table-planner.jar</destFileName>
                 </artifactItem>
               </artifactItems>
               <outputDirectory>${project.build.directory}/classes</outputDirectory>

@@ -132,7 +132,8 @@ class PlannerModule {
                     new PlannerComponentClassLoader(
                             new URL[] {
                                     glutenFile.toUri().toURL(),
-                                    tempFile.toUri().toURL()},
+                                    tempFile.toUri().toURL()
+                                    },
                             flinkClassLoader,
                             OWNER_CLASSPATH,
                             COMPONENT_CLASSPATH,
