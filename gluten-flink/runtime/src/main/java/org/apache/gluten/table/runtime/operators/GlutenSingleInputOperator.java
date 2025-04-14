@@ -22,6 +22,7 @@ import io.github.zhztheplayer.velox4j.connector.ExternalStreamConnectorSplit;
 import io.github.zhztheplayer.velox4j.connector.ExternalStreamTableHandle;
 import io.github.zhztheplayer.velox4j.iterator.CloseableIterator;
 import io.github.zhztheplayer.velox4j.iterator.DownIterators;
+import io.github.zhztheplayer.velox4j.iterator.UpIterator;
 import io.github.zhztheplayer.velox4j.iterator.UpIterators;
 import io.github.zhztheplayer.velox4j.query.BoundSplit;
 import io.github.zhztheplayer.velox4j.type.RowType;
@@ -71,9 +72,10 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
     private Query query;
     private BlockingQueue<RowVector> inputQueue;
     BufferAllocator allocator;
-    CloseableIterator<RowVector> result;
+    UpIterator result;
 
     public GlutenSingleInputOperator(PlanNode plan, String id, RowType inputType, RowType outputType) {
+        LOG.info("create input: {}", java.util.Arrays.asList(Thread.currentThread().getStackTrace()));
         this.glutenPlan = plan;
         this.id = id;
         this.inputType = inputType;
@@ -89,22 +91,19 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
         inputQueue = new LinkedBlockingQueue<>();
         ExternalStream es =
                 session.externalStreamOps().bind(DownIterators.fromBlockingQueue(inputQueue));
-        List<BoundSplit> splits = List.of(
-                new BoundSplit(
-                        id,
-                        -1,
-                        new ExternalStreamConnectorSplit("connector-external-stream", es.id())));
+        ExternalStreamConnectorSplit esConnector = new ExternalStreamConnectorSplit("connector-external-stream", es.id());
+        List<BoundSplit> splits = List.of(new BoundSplit(id, -1, esConnector));
         // add a mock input as velox not allow the source is empty.
         PlanNode mockInput = new TableScanNode(
                 id,
                 inputType,
-                new ExternalStreamTableHandle("connector-external-stream"),
+                new ExternalStreamTableHandle(esConnector.getConnectorId()),
                 List.of());
-        glutenPlan.setSources(List.of(mockInput));
-        LOG.debug("Gluten Plan: {}", Serde.toJson(glutenPlan));
-        query = new Query(glutenPlan, splits, Config.empty(), ConnectorConfig.empty());
+        /// glutenPlan.setSources(List.of(mockInput));
+        /// LOG.debug("Gluten Plan: {}", Serde.toJson(glutenPlan));
+        query = new Query(mockInput, splits, Config.empty(), ConnectorConfig.empty());
         allocator = new RootAllocator(Long.MAX_VALUE);
-        result = UpIterators.asJavaIterator(session.queryOps().execute(query));
+        result = session.queryOps().execute(query);
     }
 
     @Override
@@ -115,15 +114,19 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
                         allocator,
                         session,
                         inputType));
-        if (result.hasNext()) {
+        result.waitFor();
+        if (result.advance() == UpIterator.State.AVAILABLE) {
+            LOG.info("has next element here");
             List<RowData> rows = FlinkRowToVLVectorConvertor.toRowData(
-                    result.next(),
+                    result.get(),
                     allocator,
                     session,
                     outputType);
             for (RowData row : rows) {
                 output.collect(outElement.replace(row));
             }
+        } else {
+            LOG.info("result can not be handled, as it is not available.");
         }
     }
 

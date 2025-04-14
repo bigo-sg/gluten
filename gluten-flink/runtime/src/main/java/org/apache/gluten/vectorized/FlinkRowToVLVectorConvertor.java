@@ -31,11 +31,13 @@ import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.TimeStampMilliVector;
 import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.complex.StructVector;
+import org.apache.arrow.vector.holders.TimeStampMilliHolder;
 import org.apache.arrow.vector.table.Table;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.data.binary.BinaryStringData;
 
 import java.util.ArrayList;
@@ -68,6 +70,11 @@ public class FlinkRowToVLVectorConvertor {
                 stringVector.setSafe(0, row.getString(i).toBytes());
                 stringVector.setValueCount(1);
                 arrowVectors.add(i, stringVector);
+            } else if (fieldType instanceof TimestampType) {
+                TimeStampMilliVector timestampVector = new TimeStampMilliVector(rowType.getNames().get(i), allocator);
+                TimestampData timestampData = row.getTimestamp(i, 3);
+                timestampVector.setSafe(i, timestampData.getMillisecond());
+                arrowVectors.add(i, timestampVector);
             } else if (fieldType instanceof RowType) {
                 // TODO: refine this
                 StructVector structVector =
