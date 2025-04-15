@@ -11,7 +11,7 @@ nav_order: 1
 | Flink | 1.19.2                       |
 | OS    | Ubuntu20.04/22.04, Centos7/8 |
 | jdk   | openjdk11/jdk17              |
-| scala | 2.12                         |
+| scala | 2.12(optional)               |
 
 # Prerequisite
 
