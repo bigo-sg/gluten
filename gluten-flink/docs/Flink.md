@@ -129,6 +129,43 @@ java -version
 ```
 The result is in `build-target`.
 
+#### Update flink/bin/config.sh
+
+We need to ensure that Gluten jars are loaded before Flink runtime jars. Update flink/bin/config.sh as follows:
+```
+47,55c47
+<     SCRIPT_PATH=$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")
+<     FLINK_BIN_DIR=$(dirname $SCRIPT_PATH)
+<     raw_gluten_jars=$(cat $FLINK_BIN_DIR/../extra_jars.txt)
+<     GLUTEN_JARS=""
+<     for jar in $raw_gluten_jars
+<     do
+<         GLUTEN_JARS=$GLUTEN_JARS""$jar":"
+<     done
+<     echo "$GLUTEN_JARS""$FLINK_CLASSPATH""$FLINK_DIST"
+---
+>     echo "$FLINK_CLASSPATH""$FLINK_DIST"
+```
+
+and create a file `extra_jars.txt` in flink root dir. Each line in the file contains the absolute path of a JAR file. These JARs will be loaded first.
+```
+/data1/workspace/docker_env/gluten_flink_runtime/gluten-flink-loader-1.4.0-SNAPSHOT.jar
+/data1/workspace/docker_env/gluten_flink_runtime/gluten-flink-runtime-1.4.0-SNAPSHOT.jar
+/data1/workspace/docker_env/gluten_flink_runtime/velox4j-0.1.0-SNAPSHOT.jar
+/data1/workspace/docker_env/gluten_flink_runtime/libguava-33.4.0-jre.jar
+/data1/workspace/docker_env/gluten_flink_runtime/jackson-core-2.18.0.jar
+/data1/workspace/docker_env/gluten_flink_runtime/jackson-databind-2.18.0.jar
+/data1/workspace/docker_env/gluten_flink_runtime/jackson-datatype-jdk8-2.18.0.jar
+/data1/workspace/docker_env/gluten_flink_runtime/jackson-annotations-2.18.0.jar
+/data1/workspace/docker_env/gluten_flink_runtime/arrow-memory-core-18.1.0.jar
+/data1/workspace/docker_env/gluten_flink_runtime/arrow-memory-unsafe-18.1.0.jar
+/data1/workspace/docker_env/gluten_flink_runtime/arrow-vector-18.2.0.jar
+/data1/workspace/docker_env/gluten_flink_runtime/flatbuffers-java-24.3.25.jar
+/data1/workspace/docker_env/gluten_flink_runtime/arrow-format-18.1.0.jar
+/data1/workspace/docker_env/gluten_flink_runtime/arrow-c-data-18.1.0.jar
+```
+
+#### Run test
 
 
 After deploying flink binaries, please add gluten-flink jar to flink library path,
@@ -144,6 +181,14 @@ bin/flink run -d -m 0.0.0.0:8081 \
     lib/flink-examples-table_2.12-1.20.1.jar
 ```
 
+Another example supports all operators executed by native. 
+You can use the data-generator.sql in dev directory.
+
+```bash
+bin/start-cluster.sh 
+./bin/sql-client.sh -f data-generator.sql 
+```
+
 If you encounter an error similar to the following:
 ```
 Caused by: java.util.concurrent.CompletionException: org.apache.flink.shaded.netty4.io.netty.channel.AbstractChannel$AnnotatedConnectException: Connection refused: /0.0.0.0:8081
@@ -152,69 +197,6 @@ Please check flink/conf/config.xml. Changing all localhost entries to 0.0.0.0 ma
 
 Then you can get the result in `log/flink-*-taskexecutor-*.out`.
 And you can see an operator named `gluten-cal` from the web frontend of your flink job. 
-
-#### All operators executed by native
-Another example supports all operators executed by native. 
-You can use the data-generator.sql in dev directory.
-
-```bash
-wget  https://archive.apache.org/dist/flink/flink-1.19.2/flink-1.19.2-bin-scala_2.12.tgz  
-tar zxvf flink-1.19.1-bin-scala_2.12.tgz  
-cd flink-1.19.2
-ps -ef | grep flink  
-bash -x deploy.sh  
-bin/start-cluster.sh 
-./bin/sql-client.sh -f data-generator.sql 
-```
-
-deploy.sh is a script to deploy the jars to the lib directory of Flink.
-``` bash
-#!/bin/bash
-
-gluten_src_dir="/data1/liyang/cppproject/gluten/gluten-flink"
-other_src_dir="/root/.m2/repository"
-dst_dir="/data1/liyang/cppproject/spark/flink/flink-1.19.2/lib"
-
-# 定义JAR包列表的数组
-GLUTEN_JAR=(
-    "$gluten_src_dir/loader/target/gluten-flink-loader-1.4.0-SNAPSHOT.jar"
-    "$other_src_dir/io/github/zhztheplayer/velox4j/0.1.0-SNAPSHOT/velox4j-0.1.0-SNAPSHOT.jar"
-    "$gluten_src_dir/runtime/target/gluten-flink-runtime-1.4.0-SNAPSHOT.jar"
-)
-OTHER_JAR=(
-    "$other_src_dir/com/google/guava/guava/33.4.0-jre/guava-33.4.0-jre.jar"
-    "$other_src_dir/com/fasterxml/jackson/core/jackson-core/2.18.0/jackson-core-2.18.0.jar"
-    "$other_src_dir/com/fasterxml/jackson/core/jackson-databind/2.18.0/jackson-databind-2.18.0.jar"
-    "$other_src_dir/com/fasterxml/jackson/datatype/jackson-datatype-jdk8/2.18.0/jackson-datatype-jdk8-2.18.0.jar"
-    "$other_src_dir/com/fasterxml/jackson/core/jackson-annotations/2.18.0/jackson-annotations-2.18.0.jar"
-    "$other_src_dir/org/apache/arrow/arrow-memory-core/18.1.0/arrow-memory-core-18.1.0.jar"
-    "$other_src_dir/org/apache/arrow/arrow-memory-unsafe/18.1.0/arrow-memory-unsafe-18.1.0.jar"
-    "$other_src_dir/org/apache/arrow/arrow-vector/18.2.0/arrow-vector-18.2.0.jar"
-    "$other_src_dir/com/google/flatbuffers/flatbuffers-java/24.3.25/flatbuffers-java-24.3.25.jar"
-    "$other_src_dir/org/apache/arrow/arrow-format/18.1.0/arrow-format-18.1.0.jar"
-    "$other_src_dir/org/apache/arrow/arrow-c-data/18.1.0/arrow-c-data-18.1.0.jar"
-)
-
-# 合并两个数组
-ALL_JARS=("${GLUTEN_JAR[@]}" "${OTHER_JAR[@]}")
-
-# 遍历所有JAR文件路径
-cd $dst_dir || exit
-
-for jar in "${ALL_JARS[@]}"; do
-    if [ ! -f "$jar" ]; then
-        echo "File $jar does not exist."
-        exit 1
-    fi
-
-    # 获取文件名
-    filename=$(basename "$jar")
-
-    # 创建符号链接
-    ln -sf "$jar" "$filename"
-    echo "Created symlink for $filename"
-done
-```
 
 ### Flink Yarn per job mode
 
