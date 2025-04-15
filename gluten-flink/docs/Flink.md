@@ -73,7 +73,7 @@ There are currently modifications to velox4j that have not been merged upstream.
 git clone https://github.com/bigo-sg/velox4j.git
 cd velox4j
 git checkout -b gluten origin/gluten
-mvn clean install
+mvn clean install -Dgpg.skip=true
 ```
 **Get gluten**
 
