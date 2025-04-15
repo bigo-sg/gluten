@@ -82,6 +82,7 @@ mvn clean install -Dgpg.skip=true
 
 ## fetch gluten code
 git clone https://github.com/apache/incubator-gluten.git
+git checkout flink
 ```
 
 # Build Gluten Flink with Velox Backend
