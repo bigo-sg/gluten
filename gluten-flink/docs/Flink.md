@@ -21,6 +21,30 @@ Currently, the officially supported Flink version is 1.19.2.
 
 We need to set up the `JAVA_HOME` env. Currently, Gluten supports **java 11** and **java 17**.
 
+You can follow the steps below to set up the compilation environment for x86_64 in Ubuntu.
+
+```bash
+apt update
+apt install software-properties-common
+add-apt-repository ppa:ubuntu-toolchain-r/test
+apt update
+apt install gcc-11 g++-11
+ln -s /usr/bin/gcc-11 /usr/bin/gcc
+ln -s /usrbin/g++-11 /usr/bin/g++
+
+
+git clone https://github.com/facebookincubator/velox.git
+cd velox
+./scripts/setup-ubuntu.sh
+
+apt install openjdk-11-jdk maven
+apt install patchelf
+
+curl -fL https://github.com/coursier/coursier/releases/latest/download/cs-x86_64-pc-linux.gz | gzip -d > cs && chmod +x cs && ./cs setup
+cs install scala:2.12.8 && cs install scalac:2.12.8
+
+```
+
 **For x86_64**
 
 ```bash
@@ -42,11 +66,13 @@ export PATH=$JAVA_HOME/bin:$PATH
 Gluten for Flink depends on [Velox4j](https://github.com/velox4j/velox4j) to call velox. This is an experimental feature.
 You need to get the Velox4j code, and compile it first.
 
+There are currently modifications to velox4j that have not been merged upstream. Please fetch the corresponding branch from https://github.com/bigo-sg/velox4j.git.
+
 ```bash
 ## fetch velox4j code
 git clone https://github.com/bigo-sg/velox4j.git
 cd velox4j
-git checkout gluten
+git checkout -b gluten origin/gluten
 mvn clean install
 ```
 **Get gluten**
@@ -76,6 +102,34 @@ Submit test script from `flink run`. You can use the `StreamSQLExample` as an ex
 
 ### Flink local cluster
 
+Deploy local flink cluster as following
+
+#### Prepare flink binaries
+##### Download the pre-compiled package from the official website.
+```bash
+# 1.19.2 is used at present
+https://dlcdn.apache.org/flink/flink-1.19.2/flink-1.19.2-bin-scala_2.12.tgz
+tar -xf flink-1.19.2-bin-scala_2.12.tgz
+cd flink-1.19.2
+```
+##### Or compile from the source
+```bash
+git clone https://github.com/apache/flink.git
+cd flink
+git checkout v-1.19.2 release-1.19.2
+
+java_version=11
+export JAVA_HOME=/usr/lib/jvm/java-1.${java_version}.0-openjdk-amd64
+echo $JAVA_HOME
+export PATH=$JAVA_HOME/bin:$PATH
+java -version
+
+./mvnw package -DskipTests -Djdk${java_version} -Pjava${java_version}-target -Drat.skip=true
+```
+The result is in `build-target`.
+
+
+
 After deploying flink binaries, please add gluten-flink jar to flink library path,
 including gluten-flink-runtime-1.4.0.jar, gluten-flink-loader-1.4.0.jar and Velox4j jars above.
 And make them loaded before flink libraries.
@@ -84,10 +138,16 @@ submit the example job.
 
 ```bash
 bin/start-cluster.sh
-bin/flink run -d -m 0.0.0.0:8080 \
+bin/flink run -d -m 0.0.0.0:8081 \
     -c org.apache.flink.table.examples.java.basics.StreamSQLExample \
     lib/flink-examples-table_2.12-1.20.1.jar
 ```
+
+If you encounter an error similar to the following:
+```
+Caused by: java.util.concurrent.CompletionException: org.apache.flink.shaded.netty4.io.netty.channel.AbstractChannel$AnnotatedConnectException: Connection refused: /0.0.0.0:8081
+```
+Please check flink/conf/config.xml. Changing all localhost entries to 0.0.0.0 may resolve this issue.
 
 Then you can get the result in `log/flink-*-taskexecutor-*.out`.
 And you can see an operator named `gluten-cal` from the web frontend of your flink job. 
