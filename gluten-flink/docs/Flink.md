@@ -125,7 +125,7 @@ echo $JAVA_HOME
 export PATH=$JAVA_HOME/bin:$PATH
 java -version
 
-./mvnw package -DskipTests -Djdk${java_version} -Pjava${java_version}-target -Drat.skip=true
+./mvn package -DskipTests -Djdk${java_version} -Pjava${java_version}-target -Drat.skip=true
 ```
 The result is in `build-target`.
 
