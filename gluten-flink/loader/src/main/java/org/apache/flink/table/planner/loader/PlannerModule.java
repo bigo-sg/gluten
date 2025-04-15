@@ -28,9 +28,6 @@ import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.util.FileUtils;
 import org.apache.flink.util.IOUtils;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
@@ -54,8 +51,6 @@ class PlannerModule {
      * artifact.
      */
     static final String FLINK_TABLE_PLANNER_FAT_JAR = "flink-table-planner.jar";
-
-    private static final Logger LOG = LoggerFactory.getLogger(PlannerModule.class);
 
     private static final String HINT_USAGE =
             "mvn clean package -pl flink-table/flink-table-planner,flink-table/flink-table-planner-loader -DskipTests";
@@ -101,7 +96,6 @@ class PlannerModule {
 
     private PlannerModule() {
         try {
-            LOG.info("plannerModule 2222");
             final ClassLoader flinkClassLoader = PlannerModule.class.getClassLoader();
 
             final Path tmpDirectory =

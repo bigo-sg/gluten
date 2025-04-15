@@ -49,9 +49,6 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonCre
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.gluten.util.PlanNodeIdGenerator;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import javax.annotation.Nullable;
 
 import java.util.Collections;
@@ -65,8 +62,6 @@ import java.util.List;
         minPlanVersion = FlinkVersion.v1_15,
         minStateVersion = FlinkVersion.v1_15)
 public class StreamExecCalc extends CommonExecCalc implements StreamExecNode<RowData> {
-
-    private static final Logger LOG = LoggerFactory.getLogger(StreamExecCalc.class);
 
     public StreamExecCalc(
             ReadableConfig tableConfig,
@@ -136,7 +131,6 @@ public class StreamExecCalc extends CommonExecCalc implements StreamExecNode<Row
         io.github.zhztheplayer.velox4j.type.RowType outputType =
                 (io.github.zhztheplayer.velox4j.type.RowType)
                         LogicalTypeConverter.toVLType(getOutputType());
-        
         final GlutenSingleInputOperator calOperator =
                 new GlutenSingleInputOperator(
                         project,
