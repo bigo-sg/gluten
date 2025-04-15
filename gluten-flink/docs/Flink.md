@@ -97,7 +97,62 @@ Another example supports all operators executed by native.
 You can use the data-generator.sql in dev directory.
 
 ```bash
-bin/sql-client.sh -f data-generator.sql
+wget  https://archive.apache.org/dist/flink/flink-1.19.2/flink-1.19.2-bin-scala_2.12.tgz  
+tar zxvf flink-1.19.1-bin-scala_2.12.tgz  
+cd flink-1.19.2
+ps -ef | grep flink  
+bash -x deploy.sh  
+bin/start-cluster.sh 
+./bin/sql-client.sh -f data-generator.sql 
+```
+
+deploy.sh is a script to deploy the jars to the lib directory of Flink.
+``` bash
+#!/bin/bash
+
+gluten_src_dir="/data1/liyang/cppproject/gluten/gluten-flink"
+other_src_dir="/root/.m2/repository"
+dst_dir="/data1/liyang/cppproject/spark/flink/flink-1.19.2/lib"
+
+# 定义JAR包列表的数组
+GLUTEN_JAR=(
+    "$gluten_src_dir/loader/target/gluten-flink-loader-1.4.0-SNAPSHOT.jar"
+    "$other_src_dir/io/github/zhztheplayer/velox4j/0.1.0-SNAPSHOT/velox4j-0.1.0-SNAPSHOT.jar"
+    "$gluten_src_dir/runtime/target/gluten-flink-runtime-1.4.0-SNAPSHOT.jar"
+)
+OTHER_JAR=(
+    "$other_src_dir/com/google/guava/guava/33.4.0-jre/guava-33.4.0-jre.jar"
+    "$other_src_dir/com/fasterxml/jackson/core/jackson-core/2.18.0/jackson-core-2.18.0.jar"
+    "$other_src_dir/com/fasterxml/jackson/core/jackson-databind/2.18.0/jackson-databind-2.18.0.jar"
+    "$other_src_dir/com/fasterxml/jackson/datatype/jackson-datatype-jdk8/2.18.0/jackson-datatype-jdk8-2.18.0.jar"
+    "$other_src_dir/com/fasterxml/jackson/core/jackson-annotations/2.18.0/jackson-annotations-2.18.0.jar"
+    "$other_src_dir/org/apache/arrow/arrow-memory-core/18.1.0/arrow-memory-core-18.1.0.jar"
+    "$other_src_dir/org/apache/arrow/arrow-memory-unsafe/18.1.0/arrow-memory-unsafe-18.1.0.jar"
+    "$other_src_dir/org/apache/arrow/arrow-vector/18.2.0/arrow-vector-18.2.0.jar"
+    "$other_src_dir/com/google/flatbuffers/flatbuffers-java/24.3.25/flatbuffers-java-24.3.25.jar"
+    "$other_src_dir/org/apache/arrow/arrow-format/18.1.0/arrow-format-18.1.0.jar"
+    "$other_src_dir/org/apache/arrow/arrow-c-data/18.1.0/arrow-c-data-18.1.0.jar"
+)
+
+# 合并两个数组
+ALL_JARS=("${GLUTEN_JAR[@]}" "${OTHER_JAR[@]}")
+
+# 遍历所有JAR文件路径
+cd $dst_dir || exit
+
+for jar in "${ALL_JARS[@]}"; do
+    if [ ! -f "$jar" ]; then
+        echo "File $jar does not exist."
+        exit 1
+    fi
+
+    # 获取文件名
+    filename=$(basename "$jar")
+
+    # 创建符号链接
+    ln -sf "$jar" "$filename"
+    echo "Created symlink for $filename"
+done
 ```
 
 ### Flink Yarn per job mode
