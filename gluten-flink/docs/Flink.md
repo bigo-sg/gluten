@@ -82,7 +82,7 @@ mvn clean install -Dgpg.skip=true
 ## config maven, like proxy in ~/.m2/settings.xml
 
 ## fetch gluten code
-git clone https://github.com/apache/incubator-gluten.git
+git clone https://github.com/bigo-sg/gluten.git
 git checkout flink
 ```
 
