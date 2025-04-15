@@ -149,20 +149,20 @@ We need to ensure that Gluten jars are loaded before Flink runtime jars. Update 
 
 and create a file `extra_jars.txt` in flink root dir. Each line in the file contains the absolute path of a JAR file. These JARs will be loaded first.
 ```
-/data1/workspace/docker_env/gluten_flink_runtime/gluten-flink-loader-1.4.0-SNAPSHOT.jar
-/data1/workspace/docker_env/gluten_flink_runtime/gluten-flink-runtime-1.4.0-SNAPSHOT.jar
-/data1/workspace/docker_env/gluten_flink_runtime/velox4j-0.1.0-SNAPSHOT.jar
-/data1/workspace/docker_env/gluten_flink_runtime/libguava-33.4.0-jre.jar
-/data1/workspace/docker_env/gluten_flink_runtime/jackson-core-2.18.0.jar
-/data1/workspace/docker_env/gluten_flink_runtime/jackson-databind-2.18.0.jar
-/data1/workspace/docker_env/gluten_flink_runtime/jackson-datatype-jdk8-2.18.0.jar
-/data1/workspace/docker_env/gluten_flink_runtime/jackson-annotations-2.18.0.jar
-/data1/workspace/docker_env/gluten_flink_runtime/arrow-memory-core-18.1.0.jar
-/data1/workspace/docker_env/gluten_flink_runtime/arrow-memory-unsafe-18.1.0.jar
-/data1/workspace/docker_env/gluten_flink_runtime/arrow-vector-18.2.0.jar
-/data1/workspace/docker_env/gluten_flink_runtime/flatbuffers-java-24.3.25.jar
-/data1/workspace/docker_env/gluten_flink_runtime/arrow-format-18.1.0.jar
-/data1/workspace/docker_env/gluten_flink_runtime/arrow-c-data-18.1.0.jar
+/work/gluten-flink/gluten-flink/loader/target/gluten-flink-loader-1.4.0-SNAPSHOT.jar
+/work/gluten-flink/gluten-flink/runtime/target/gluten-flink-runtime-1.4.0-SNAPSHOT.jar
+/root/.m2/repository/io/github/zhztheplayer/velox4j/0.1.0-SNAPSHOT/velox4j-0.1.0-SNAPSHOT.jar
+/root/.m2/repository/org/apache/arrow/arrow-memory-unsafe/18.1.0/arrow-memory-unsafe-18.1.0.jar
+/root/.m2/repository/org/apache/arrow/arrow-vector/18.2.0/arrow-vector-18.2.0.jar
+/root/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.18.0/jackson-core-2.18.0.jar
+/root/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.18.0/jackson-databind-2.18.0.jar
+/root/.m2/repository/com/fasterxml/jackson/datatype/jackson-datatype-jdk8/2.18.0/jackson-datatype-jdk8-2.18.0.jar
+/root/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.18.0/jackson-annotations-2.18.0.jar
+/root/.m2/repository/org/apache/arrow/arrow-memory-core/18.1.0/arrow-memory-core-18.1.0.jar
+/root/.m2/repository/com/google/flatbuffers/flatbuffers-java/24.3.25/flatbuffers-java-24.3.25.jar
+/root/.m2/repository/org/apache/arrow/arrow-format/18.1.0/arrow-format-18.1.0.jar
+/root/.m2/repository/org/apache/arrow/arrow-c-data/18.1.0/arrow-c-data-18.1.0.jar
+/root/.m2/repository/com/google/guava/guava/33.4.0-jre/guava-33.4.0-jre.jar
 ```
 
 #### Run test
