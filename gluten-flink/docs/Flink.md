@@ -40,6 +40,7 @@ cd velox
 apt install openjdk-11-jdk maven
 apt install patchelf
 
+# optional, no need for now
 curl -fL https://github.com/coursier/coursier/releases/latest/download/cs-x86_64-pc-linux.gz | gzip -d > cs && chmod +x cs && ./cs setup
 cs install scala:2.12.8 && cs install scalac:2.12.8
 
