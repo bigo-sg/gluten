@@ -84,7 +84,6 @@ public class StreamExecCalc extends CommonExecCalc implements StreamExecNode<Row
                 Collections.singletonList(inputProperty),
                 outputType,
                 description);
-        LOG.info("StreamExecCalc 1111");
     }
 
     @JsonCreator
@@ -108,7 +107,6 @@ public class StreamExecCalc extends CommonExecCalc implements StreamExecNode<Row
                 inputProperties,
                 outputType,
                 description);
-        LOG.info("StreamExecCalc 2222");
     }
 
     @Override
@@ -139,14 +137,12 @@ public class StreamExecCalc extends CommonExecCalc implements StreamExecNode<Row
                 (io.github.zhztheplayer.velox4j.type.RowType)
                         LogicalTypeConverter.toVLType(getOutputType());
         
-        LOG.info("before create single input operator");
         final GlutenSingleInputOperator calOperator =
                 new GlutenSingleInputOperator(
                         project,
                         PlanNodeIdGenerator.newId(),
                         inputType,
                         outputType);
-        LOG.info("after create single input operator");
         return ExecNodeUtil.createOneInputTransformation(
                 inputTransform,
                 new TransformationMetadata("gluten-calc", "Gluten cal operator"),

@@ -20,10 +20,8 @@ package org.apache.gluten.table.runtime.operators;
 import io.github.zhztheplayer.velox4j.connector.ExternalStream;
 import io.github.zhztheplayer.velox4j.connector.ExternalStreamConnectorSplit;
 import io.github.zhztheplayer.velox4j.connector.ExternalStreamTableHandle;
-import io.github.zhztheplayer.velox4j.iterator.CloseableIterator;
 import io.github.zhztheplayer.velox4j.iterator.DownIterators;
 import io.github.zhztheplayer.velox4j.iterator.UpIterator;
-import io.github.zhztheplayer.velox4j.iterator.UpIterators;
 import io.github.zhztheplayer.velox4j.query.BoundSplit;
 import io.github.zhztheplayer.velox4j.type.RowType;
 import org.apache.flink.client.StreamGraphTranslator;
@@ -39,7 +37,6 @@ import io.github.zhztheplayer.velox4j.memory.MemoryManager;
 import io.github.zhztheplayer.velox4j.plan.PlanNode;
 import io.github.zhztheplayer.velox4j.plan.TableScanNode;
 import io.github.zhztheplayer.velox4j.query.Query;
-import io.github.zhztheplayer.velox4j.serde.Serde;
 import io.github.zhztheplayer.velox4j.session.Session;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
@@ -75,7 +72,6 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
     UpIterator result;
 
     public GlutenSingleInputOperator(PlanNode plan, String id, RowType inputType, RowType outputType) {
-        LOG.info("create input: {}", java.util.Arrays.asList(Thread.currentThread().getStackTrace()));
         this.glutenPlan = plan;
         this.id = id;
         this.inputType = inputType;
@@ -99,7 +95,7 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
                 inputType,
                 new ExternalStreamTableHandle(esConnector.getConnectorId()),
                 List.of());
-        /// glutenPlan.setSources(List.of(mockInput));
+        glutenPlan.setSources(List.of(mockInput));
         /// LOG.debug("Gluten Plan: {}", Serde.toJson(glutenPlan));
         query = new Query(mockInput, splits, Config.empty(), ConnectorConfig.empty());
         allocator = new RootAllocator(Long.MAX_VALUE);
@@ -108,15 +104,10 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
 
     @Override
     public void processElement(StreamRecord<RowData> element) {
-        inputQueue.add(
-                FlinkRowToVLVectorConvertor.fromRowData(
-                        element.getValue(),
-                        allocator,
-                        session,
-                        inputType));
+        RowVector rowVector = FlinkRowToVLVectorConvertor.fromRowData(element.getValue(), allocator, session, inputType);
+        inputQueue.add(rowVector);
         result.waitFor();
         if (result.advance() == UpIterator.State.AVAILABLE) {
-            LOG.info("has next element here");
             List<RowData> rows = FlinkRowToVLVectorConvertor.toRowData(
                     result.get(),
                     allocator,
