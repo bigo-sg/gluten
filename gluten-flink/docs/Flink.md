@@ -98,7 +98,7 @@ You can use the data-generator.sql in dev directory.
 
 ```bash
 wget  https://archive.apache.org/dist/flink/flink-1.19.2/flink-1.19.2-bin-scala_2.12.tgz  
-tar zxvf flink-1.19.1-bin-scala_2.12.tgz  
+tar zxvf flink-1.19.2-bin-scala_2.12.tgz  
 cd flink-1.19.2
 ps -ef | grep flink  
 bash -x deploy.sh  
