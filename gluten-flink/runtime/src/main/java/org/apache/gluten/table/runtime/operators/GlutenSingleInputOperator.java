@@ -17,34 +17,28 @@
 
 package org.apache.gluten.table.runtime.operators;
 
-import org.apache.gluten.streaming.api.operators.GlutenOperator;
-import org.apache.gluten.table.runtime.operators.RowToVectorChannel;
-import org.apache.gluten.table.runtime.operators.VectorToRowChannel;
-import org.apache.gluten.table.runtime.operators.VeloxExecuteSession;
+import io.github.zhztheplayer.velox4j.type.RowType;
 
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
-import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
-import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.runtime.operators.TableStreamOperator;
-
+import org.apache.gluten.streaming.api.operators.GlutenOperator;
+import org.apache.flink.api.java.tuple.Tuple2;
 import io.github.zhztheplayer.velox4j.Velox4j;
 import io.github.zhztheplayer.velox4j.config.Config;
 import io.github.zhztheplayer.velox4j.config.ConnectorConfig;
 import io.github.zhztheplayer.velox4j.plan.PlanNode;
-import io.github.zhztheplayer.velox4j.query.BoundSplit;
 import io.github.zhztheplayer.velox4j.query.Query;
 import io.github.zhztheplayer.velox4j.serde.Serde;
-import io.github.zhztheplayer.velox4j.session.Session;
-import io.github.zhztheplayer.velox4j.type.RowType;
-
+import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
+import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
+import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.runtime.operators.TableStreamOperator;
+import io.github.zhztheplayer.velox4j.query.BoundSplit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 
 /** Calculate operator in gluten, which will call Velox to run. */
 public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
@@ -63,6 +57,7 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
     private VeloxExecuteSession executeSession;
 
     public GlutenSingleInputOperator(PlanNode plan, String id, RowType inputType, RowType outputType) {
+        LOG.info("call stack:{}", Arrays.asList(Thread.currentThread().getStackTrace()));
         this.glutenPlan = plan;
         this.id = id;
         this.inputType = inputType;
@@ -73,7 +68,6 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
     public void open() throws Exception {
         super.open();
         executeSession = new VeloxExecuteSession();
-
         inputChannel = new RowToVectorChannel(executeSession.getSession(),
                 inputType,
                 executeSession.getAllocator(),

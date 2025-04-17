@@ -71,8 +71,6 @@ public class GlutenSourceFunction extends RichParallelSourceFunction<RowData> {
 
     @Override
     public void run(SourceContext<RowData> sourceContext) throws Exception {
-
-        final List<BoundSplit> splits = List.of(new BoundSplit(id, -1, split));
         final Query query = new Query(planNode, splits, Config.empty(), ConnectorConfig.empty());
         final BufferAllocator allocator = new RootAllocator(Long.MAX_VALUE);
         final MemoryManager memoryManager = MemoryManager.create(AllocationListener.NOOP);
