@@ -42,6 +42,7 @@ import org.apache.flink.table.planner.plan.nodes.exec.InputProperty;
 import org.apache.flink.table.planner.plan.nodes.exec.common.CommonExecCalc;
 import org.apache.flink.table.planner.plan.nodes.exec.utils.ExecNodeUtil;
 import org.apache.flink.table.planner.plan.nodes.exec.utils.TransformationMetadata;
+import org.apache.flink.table.planner.utils.JavaScalaConversionUtil;
 import org.apache.flink.table.runtime.operators.TableStreamOperator;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.table.types.logical.RowType;
@@ -49,12 +50,20 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonCre
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.gluten.util.PlanNodeIdGenerator;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.annotation.Nullable;
 
 import java.util.Collections;
 import java.util.List;
 
-/** Gluten Stream {@link ExecNode} for Calc to use {@link GlutenSingleInputOperator}. */
+/*
+ * Gluten Stream {@link ExecNode} for Calc to use {@link GlutenSingleInputOperator}.
+ *
+ * This overrides the original StreamExecCalc in flink to use Velox plan node.
+ * Ensure this class is loaded before the flink's jars
+ */
 @ExecNodeMetadata(
         name = "stream-exec-calc",
         version = 1,
@@ -62,7 +71,7 @@ import java.util.List;
         minPlanVersion = FlinkVersion.v1_15,
         minStateVersion = FlinkVersion.v1_15)
 public class StreamExecCalc extends CommonExecCalc implements StreamExecNode<RowData> {
-
+    private static final Logger LOG = LoggerFactory.getLogger(StreamExecCalc.class);
     public StreamExecCalc(
             ReadableConfig tableConfig,
             List<RexNode> projection,
@@ -107,6 +116,26 @@ public class StreamExecCalc extends CommonExecCalc implements StreamExecNode<Row
     @Override
     public Transformation<RowData> translateToPlanInternal(
             PlannerBase planner, ExecNodeConfig config) {
+        Transformation<RowData> transformation = null;
+        try {
+            transformation = translateToVeloxPlan(planner, config);
+        }
+        catch (Exception e) {
+            LOG.error("Failed to translate to Velox plan, fallback to Flink plan.", e);
+            transformation = translateToFlinkPlan(planner, config);
+        }
+        return transformation;
+    }
+
+    private Transformation<RowData> translateToFlinkPlan(
+            PlannerBase planner,
+            ExecNodeConfig config) {
+        return super.translateToPlanInternal(planner, config);
+    }
+
+    private Transformation<RowData> translateToVeloxPlan(
+        PlannerBase planner,
+        ExecNodeConfig config) {
         final ExecEdge inputEdge = getInputEdges().get(0);
         final Transformation<RowData> inputTransform =
                 (Transformation<RowData>) inputEdge.translateToPlan(planner);
@@ -139,10 +168,10 @@ public class StreamExecCalc extends CommonExecCalc implements StreamExecNode<Row
                         outputType);
         return ExecNodeUtil.createOneInputTransformation(
                 inputTransform,
-                new TransformationMetadata("gluten-calc", "Gluten cal operator"),
+                new TransformationMetadata("gluten-calc", "Gluten calc operator"),
                 calOperator,
                 InternalTypeInfo.of(getOutputType()),
                 inputTransform.getParallelism(),
                 false);
-    }
+   }
 }
