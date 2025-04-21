@@ -38,7 +38,7 @@ cd velox
 ./scripts/setup-ubuntu.sh
 
 apt install openjdk-11-jdk maven
-apt install patchelf
+apt install patchelf   # use latest patchelf if you want to compile with Debug
 
 # optional, no need for now
 curl -fL https://github.com/coursier/coursier/releases/latest/download/cs-x86_64-pc-linux.gz | gzip -d > cs && chmod +x cs && ./cs setup
