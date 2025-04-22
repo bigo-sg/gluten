@@ -31,5 +31,5 @@ public class Velox4jEnv {
         return EnvHolder.INSTANCE;
     }
 
-    public void init() {}
+    public void initializeOnce() {}
 }
