@@ -208,6 +208,26 @@ Using the data-generator example, it shows that for native execution, it can gen
 records in about 60ms, while Flink generator 10,000 records in about 600ms. It runs 10 times faster.
 More perf cases to be added.
 
+## Heap profile
+If you want get heap profile, run the script below using jemalloc:
+cat run.sh
+```
+#!/bin/bash
+set -x
+
+bin/stop-cluster.sh
+
+### jemalloc
+export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so
+export MALLOC_CONF="prof:true,lg_prof_interval:30,lg_prof_sample:17,prof_leak:true,prof_final:true"
+export JEPROF_PATH=/usr/bin/jeprof
+export JE_MALLOC_CONF="prof_prefix:/tmp/gluten_jemalloc"
+
+bin/start-cluster.sh
+
+./bin/sql-client.sh -f data-generator.sql
+```
+
 ## Notes:
 Now both Gluten for Flink and Velox4j have not a bundled jar including all jars depends on.
 So you may have to add these jars by yourself, which may including guava-33.4.0-jre.jar, jackson-core-2.18.0.jar,
