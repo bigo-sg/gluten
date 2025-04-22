@@ -22,7 +22,6 @@ import io.github.zhztheplayer.velox4j.connector.ExternalStreamConnectorSplit;
 import io.github.zhztheplayer.velox4j.connector.ExternalStreamTableHandle;
 import io.github.zhztheplayer.velox4j.iterator.CloseableIterator;
 import io.github.zhztheplayer.velox4j.iterator.DownIterators;
-import io.github.zhztheplayer.velox4j.iterator.UpIterator;
 import io.github.zhztheplayer.velox4j.iterator.UpIterators;
 import io.github.zhztheplayer.velox4j.query.BoundSplit;
 import io.github.zhztheplayer.velox4j.type.RowType;
@@ -91,10 +90,10 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
         ExternalStream es =
                 session.externalStreamOps().bind(DownIterators.fromBlockingQueue(inputQueue));
         List<BoundSplit> splits = List.of(
-            new BoundSplit(
-                    id,
-                    -1,
-                    new ExternalStreamConnectorSplit("connector-external-stream", es.id())));
+                new BoundSplit(
+                        id,
+                        -1,
+                        new ExternalStreamConnectorSplit("connector-external-stream", es.id())));
         // add a mock input as velox not allow the source is empty.
         PlanNode mockInput = new TableScanNode(
                 id,

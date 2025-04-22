@@ -17,6 +17,9 @@
 
 package org.apache.gluten.streaming.api.operators;
 
+
+import io.github.zhztheplayer.velox4j.plan.PlanNode;
+import io.github.zhztheplayer.velox4j.type.RowType;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperator;
@@ -36,7 +39,7 @@ public class GlutenOneInputOperatorFactory<IN, OUT> extends AbstractStreamOperat
     }
 
     @Override
-    public <T extends StreamOperator<OUT>> T createStreamOperator(StreamOperatorParameters<OUT> parameters) {
+    public <T extends StreamOperator<OUT>> T createStreamOperator(StreamOperatorParameters<OUT> streamOperatorParameters) {
         throw new RuntimeException("Not Implemented");
     }
 
