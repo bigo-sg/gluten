@@ -21,7 +21,6 @@ import org.apache.flink.streaming.api.operators.AbstractStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
-import org.apache.flink.table.runtime.operators.TableStreamOperator;
 
 /** One input operator factory for gluten. */
 public class GlutenOneInputOperatorFactory<IN, OUT> extends AbstractStreamOperatorFactory<OUT>
@@ -38,21 +37,11 @@ public class GlutenOneInputOperatorFactory<IN, OUT> extends AbstractStreamOperat
 
     @Override
     public <T extends StreamOperator<OUT>> T createStreamOperator(StreamOperatorParameters<OUT> parameters) {
-        if (operator instanceof TableStreamOperator) {
-            TableStreamOperator<OUT> streamOperator = (TableStreamOperator<OUT>) operator;
-            streamOperator.setup(parameters.getContainingTask(), parameters.getStreamConfig(), parameters.getOutput());
-            streamOperator.setProcessingTimeService(processingTimeService);
-            return (T) operator;
-        }
         throw new RuntimeException("Not Implemented");
     }
 
     @Override
     public Class<? extends StreamOperator> getStreamOperatorClass(ClassLoader classLoader) {
-        if (operator instanceof StreamOperator) {
-            StreamOperator<?> streamOperator = (StreamOperator) operator;
-            return streamOperator.getClass();
-        }
         throw new RuntimeException("Not Implemented");
     }
 }

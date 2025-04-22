@@ -20,8 +20,10 @@ package org.apache.gluten.table.runtime.operators;
 import io.github.zhztheplayer.velox4j.connector.ExternalStream;
 import io.github.zhztheplayer.velox4j.connector.ExternalStreamConnectorSplit;
 import io.github.zhztheplayer.velox4j.connector.ExternalStreamTableHandle;
+import io.github.zhztheplayer.velox4j.iterator.CloseableIterator;
 import io.github.zhztheplayer.velox4j.iterator.DownIterators;
 import io.github.zhztheplayer.velox4j.iterator.UpIterator;
+import io.github.zhztheplayer.velox4j.iterator.UpIterators;
 import io.github.zhztheplayer.velox4j.query.BoundSplit;
 import io.github.zhztheplayer.velox4j.type.RowType;
 import org.apache.flink.client.StreamGraphTranslator;
@@ -37,6 +39,7 @@ import io.github.zhztheplayer.velox4j.memory.MemoryManager;
 import io.github.zhztheplayer.velox4j.plan.PlanNode;
 import io.github.zhztheplayer.velox4j.plan.TableScanNode;
 import io.github.zhztheplayer.velox4j.query.Query;
+import io.github.zhztheplayer.velox4j.serde.Serde;
 import io.github.zhztheplayer.velox4j.session.Session;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
@@ -69,7 +72,7 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
     private Query query;
     private BlockingQueue<RowVector> inputQueue;
     BufferAllocator allocator;
-    UpIterator result;
+    CloseableIterator<RowVector> result;
 
     public GlutenSingleInputOperator(PlanNode plan, String id, RowType inputType, RowType outputType) {
         this.glutenPlan = plan;
@@ -87,37 +90,41 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
         inputQueue = new LinkedBlockingQueue<>();
         ExternalStream es =
                 session.externalStreamOps().bind(DownIterators.fromBlockingQueue(inputQueue));
-        ExternalStreamConnectorSplit esConnector = new ExternalStreamConnectorSplit("connector-external-stream", es.id());
-        List<BoundSplit> splits = List.of(new BoundSplit(id, -1, esConnector));
+        List<BoundSplit> splits = List.of(
+            new BoundSplit(
+                    id,
+                    -1,
+                    new ExternalStreamConnectorSplit("connector-external-stream", es.id())));
         // add a mock input as velox not allow the source is empty.
         PlanNode mockInput = new TableScanNode(
                 id,
                 inputType,
-                new ExternalStreamTableHandle(esConnector.getConnectorId()),
+                new ExternalStreamTableHandle("connector-external-stream"),
                 List.of());
         glutenPlan.setSources(List.of(mockInput));
-        /// LOG.debug("Gluten Plan: {}", Serde.toJson(glutenPlan));
-        query = new Query(mockInput, splits, Config.empty(), ConnectorConfig.empty());
+        LOG.debug("Gluten Plan: {}", Serde.toJson(glutenPlan));
+        query = new Query(glutenPlan, splits, Config.empty(), ConnectorConfig.empty());
         allocator = new RootAllocator(Long.MAX_VALUE);
-        result = session.queryOps().execute(query);
+        result = UpIterators.asJavaIterator(session.queryOps().execute(query));
     }
 
     @Override
     public void processElement(StreamRecord<RowData> element) {
-        RowVector rowVector = FlinkRowToVLVectorConvertor.fromRowData(element.getValue(), allocator, session, inputType);
-        inputQueue.add(rowVector);
-        result.waitFor();
-        if (result.advance() == UpIterator.State.AVAILABLE) {
+        inputQueue.add(
+                FlinkRowToVLVectorConvertor.fromRowData(
+                        element.getValue(),
+                        allocator,
+                        session,
+                        inputType));
+        if (result.hasNext()) {
             List<RowData> rows = FlinkRowToVLVectorConvertor.toRowData(
-                    result.get(),
+                    result.next(),
                     allocator,
                     session,
                     outputType);
             for (RowData row : rows) {
                 output.collect(outElement.replace(row));
             }
-        } else {
-            LOG.info("result can not be handled, as it is not available.");
         }
     }
 
