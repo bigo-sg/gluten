@@ -18,63 +18,63 @@
 	</properties>
 
     <dependencies>
-		<dependency>
-			<groupId>org.apache.flink</groupId>
-			<artifactId>flink-table-planner_${scala.binary.version}</artifactId>
-			<version>${flink.version}</version>
-			<scope>runtime</scope>
-			<optional>true</optional>
-		</dependency>
+	  <dependency>
+		<groupId>org.apache.flink</groupId>
+		<artifactId>flink-table-planner_${scala.binary.version}</artifactId>
+		<version>${flink.version}</version>
+		<scope>runtime</scope>
+		<optional>true</optional>
+	  </dependency>
 	</dependencies>
 
     <build>
-		<plugins>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-enforcer-plugin</artifactId>
-				<executions>
-					<execution>
-						<id>forbid-direct-table-planner-dependencies</id>
-						<goals>
-							<goal>enforce</goal>
-						</goals>
-						<configuration>
-							<skip>true</skip>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
+	  <plugins>
+		<plugin>
+		  <groupId>org.apache.maven.plugins</groupId>
+		  <artifactId>maven-enforcer-plugin</artifactId>
+		  <executions>
+			<execution>
+			  <id>forbid-direct-table-planner-dependencies</id>
+			  <goals>
+				<goal>enforce</goal>
+			  </goals>
+			  <configuration>
+				<skip>true</skip>
+			  </configuration>
+			</execution>
+		  </executions>
+		</plugin>
 
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-deploy-plugin</artifactId>
-				<configuration>
-					<skip>true</skip>
+		<plugin>
+		  <groupId>org.apache.maven.plugins</groupId>
+		  <artifactId>maven-deploy-plugin</artifactId>
+		  <configuration>
+			<skip>true</skip>
+		  </configuration>
+		</plugin>
+		<plugin>
+		  <groupId>org.apache.maven.plugins</groupId>
+		  <artifactId>maven-shade-plugin</artifactId>
+		  <executions>
+		    <execution>
+			  <id>shade-flink</id>
+			  <phase>package</phase>
+			  <goals>
+				<goal>shade</goal>
+			  </goals>
+			  <configuration>
+				<artifactSet>
+				  <includes>
+					<include>org.apache.flink:flink-table-planner_${scala.binary.version}</include>
+					 <!-- flink-table-planner scala dependencies -->
+					<include>org.scala-lang:*</include>
+					<include>org.apache.flink:flink-scala_${scala.binary.version}</include>
+					</includes>
+				  </artifactSet>
 				</configuration>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-shade-plugin</artifactId>
-				<executions>
-					<execution>
-						<id>shade-flink</id>
-						<phase>package</phase>
-						<goals>
-							<goal>shade</goal>
-						</goals>
-						<configuration>
-							<artifactSet>
-								<includes>
-									<include>org.apache.flink:flink-table-planner_${scala.binary.version}</include>
-									<!-- flink-table-planner scala dependencies -->
-									<include>org.scala-lang:*</include>
-									<include>org.apache.flink:flink-scala_${scala.binary.version}</include>
-								</includes>
-							</artifactSet>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
-		</plugins>
+			  </execution>
+			</executions>
+		</plugin>
+	  </plugins>
     </build>
 </project>
