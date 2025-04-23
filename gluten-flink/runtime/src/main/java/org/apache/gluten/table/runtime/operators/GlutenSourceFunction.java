@@ -18,6 +18,7 @@
 package org.apache.gluten.table.runtime.operators;
 
 import io.github.zhztheplayer.velox4j.connector.FuzzerConnectorSplit;
+import io.github.zhztheplayer.velox4j.iterator.UpIterator;
 import io.github.zhztheplayer.velox4j.query.BoundSplit;
 import org.apache.gluten.vectorized.FlinkRowToVLVectorConvertor;
 
@@ -48,9 +49,7 @@ public class GlutenSourceFunction extends RichParallelSourceFunction<RowData> {
     private final String id;
     private volatile boolean isRunning = true;
 
-    private Session session;
     private Query query;
-    BufferAllocator allocator;
 
     public GlutenSourceFunction(PlanNode planNode, RowType outputType, String id) {
         this.planNode = planNode;
@@ -72,23 +71,30 @@ public class GlutenSourceFunction extends RichParallelSourceFunction<RowData> {
                 id,
                 -1,
                 new FuzzerConnectorSplit("connector-fuzzer", 1000)));
-        session = Velox4j.newSession(MemoryManager.create(AllocationListener.NOOP));
         query = new Query(planNode, splits, Config.empty(), ConnectorConfig.empty());
-        allocator = new RootAllocator(Long.MAX_VALUE);
 
         while (isRunning) {
-            CloseableIterator<RowVector> result =
-                    UpIterators.asJavaIterator(session.queryOps().execute(query));
-            if (result.hasNext()) {
-                List<RowData> rows = FlinkRowToVLVectorConvertor.toRowData(
-                        result.next(),
+            final BufferAllocator allocator = new RootAllocator(Long.MAX_VALUE);
+            final MemoryManager memoryManager = MemoryManager.create(AllocationListener.NOOP);
+            final Session session = Velox4j.newSession(memoryManager);
+            final UpIterator upItr = session.queryOps().execute(query);
+            final CloseableIterator<RowVector> result = UpIterators.asJavaIterator(upItr);
+            while (result.hasNext()) {
+                final RowVector outRv = result.next();
+                final List<RowData> rows = FlinkRowToVLVectorConvertor.toRowData(
+                    outRv,
                         allocator,
-                        session,
                         outputType);
                 for (RowData row : rows) {
                     sourceContext.collect(row);
                 }
+                outRv.close();
             }
+            upItr.close();
+
+            session.close();
+            memoryManager.close();
+            allocator.close();
         }
     }
 

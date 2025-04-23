@@ -22,6 +22,7 @@ import io.github.zhztheplayer.velox4j.connector.ExternalStreamConnectorSplit;
 import io.github.zhztheplayer.velox4j.connector.ExternalStreamTableHandle;
 import io.github.zhztheplayer.velox4j.iterator.CloseableIterator;
 import io.github.zhztheplayer.velox4j.iterator.DownIterators;
+import io.github.zhztheplayer.velox4j.iterator.UpIterator;
 import io.github.zhztheplayer.velox4j.iterator.UpIterators;
 import io.github.zhztheplayer.velox4j.query.BoundSplit;
 import io.github.zhztheplayer.velox4j.type.RowType;
@@ -65,8 +66,9 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
     private final RowType inputType;
     private final RowType outputType;
 
-    private StreamRecord outElement = null;
+    private StreamRecord<RowData> outElement = null;
 
+    private MemoryManager memoryManager;
     private Session session;
     private Query query;
     private BlockingQueue<RowVector> inputQueue;
@@ -84,7 +86,8 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
     public void open() throws Exception {
         super.open();
         outElement = new StreamRecord(null);
-        session = Velox4j.newSession(MemoryManager.create(AllocationListener.NOOP));
+        memoryManager = MemoryManager.create(AllocationListener.NOOP);
+        session = Velox4j.newSession(memoryManager);
 
         inputQueue = new LinkedBlockingQueue<>();
         ExternalStream es =
@@ -109,22 +112,30 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
 
     @Override
     public void processElement(StreamRecord<RowData> element) {
-        inputQueue.add(
-                FlinkRowToVLVectorConvertor.fromRowData(
-                        element.getValue(),
-                        allocator,
-                        session,
-                        inputType));
+        final RowVector inRv = FlinkRowToVLVectorConvertor.fromRowData(
+            element.getValue(),
+            allocator,
+            session,
+            inputType);
+        inputQueue.add(inRv);
         if (result.hasNext()) {
+            final RowVector outRv = result.next();
             List<RowData> rows = FlinkRowToVLVectorConvertor.toRowData(
-                    result.next(),
-                    allocator,
-                    session,
-                    outputType);
+                outRv,
+                allocator,
+                outputType);
             for (RowData row : rows) {
                 output.collect(outElement.replace(row));
             }
+            outRv.close();
         }
+      inRv.close();
+    }
+
+    @Override
+    public void close() throws Exception {
+        session.close();
+        memoryManager.close();
     }
 
     @Override
