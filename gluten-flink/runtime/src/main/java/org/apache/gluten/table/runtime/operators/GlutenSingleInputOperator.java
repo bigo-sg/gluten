@@ -17,37 +17,27 @@
 
 package org.apache.gluten.table.runtime.operators;
 
-import io.github.zhztheplayer.velox4j.connector.ExternalStream;
-import io.github.zhztheplayer.velox4j.connector.ExternalStreamConnectorSplit;
-import io.github.zhztheplayer.velox4j.connector.ExternalStreamTableHandle;
-import io.github.zhztheplayer.velox4j.iterator.DownIterators;
-import io.github.zhztheplayer.velox4j.iterator.UpIterator;
-import io.github.zhztheplayer.velox4j.query.BoundSplit;
-import io.github.zhztheplayer.velox4j.type.RowType;
 import org.apache.gluten.streaming.api.operators.GlutenOperator;
 import org.apache.gluten.table.runtime.operators.RowToVectorChannel;
 import org.apache.gluten.table.runtime.operators.VectorToRowChannel;
-import org.apache.gluten.vectorized.FlinkRowToVLVectorConvertor;
+import org.apache.gluten.table.runtime.operators.VeloxExecuteSession;
 
-import io.github.zhztheplayer.velox4j.Velox4j;
-import io.github.zhztheplayer.velox4j.config.Config;
-import io.github.zhztheplayer.velox4j.config.ConnectorConfig;
-import io.github.zhztheplayer.velox4j.data.RowVector;
-import io.github.zhztheplayer.velox4j.memory.AllocationListener;
-import io.github.zhztheplayer.velox4j.memory.MemoryManager;
-import io.github.zhztheplayer.velox4j.plan.PlanNode;
-import io.github.zhztheplayer.velox4j.plan.TableScanNode;
-import io.github.zhztheplayer.velox4j.query.Query;
-import io.github.zhztheplayer.velox4j.serde.Serde;
-import io.github.zhztheplayer.velox4j.session.Session;
-import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.memory.RootAllocator;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.runtime.operators.TableStreamOperator;
-import org.apache.flink.api.java.tuple.Tuple2;
+
+import io.github.zhztheplayer.velox4j.Velox4j;
+import io.github.zhztheplayer.velox4j.config.Config;
+import io.github.zhztheplayer.velox4j.config.ConnectorConfig;
+import io.github.zhztheplayer.velox4j.plan.PlanNode;
+import io.github.zhztheplayer.velox4j.query.BoundSplit;
+import io.github.zhztheplayer.velox4j.query.Query;
+import io.github.zhztheplayer.velox4j.serde.Serde;
+import io.github.zhztheplayer.velox4j.session.Session;
+import io.github.zhztheplayer.velox4j.type.RowType;
+
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,15 +59,10 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
     private final RowType inputType;
     private final RowType outputType;
 
-    private StreamRecord<RowData> outElement = null;
-
-    private MemoryManager memoryManager;
-    private Session session;
     private Query query;
-    BufferAllocator allocator;
-    CloseableIterator<RowVector> outputIter;
     private RowToVectorChannel inputChannel;
     private VectorToRowChannel outputChannel;
+    private VeloxExecuteSession executeSession;
 
     public GlutenSingleInputOperator(PlanNode plan, String id, RowType inputType, RowType outputType) {
         this.glutenPlan = plan;
@@ -89,22 +74,22 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
     @Override
     public void open() throws Exception {
         super.open();
-        outElement = new StreamRecord(null);
-        memoryManager = MemoryManager.create(AllocationListener.NOOP);
-        session = Velox4j.newSession(memoryManager);
+        executeSession = new VeloxExecuteSession();
 
-        allocator = new RootAllocator(Long.MAX_VALUE);
-
-        inputChannel = new RowToVectorChannel(session, inputType, allocator, id);
+        inputChannel = new RowToVectorChannel(executeSession.getSession(),
+                inputType,
+                executeSession.getAllocator(),
+                id);
         Tuple2<PlanNode, List<BoundSplit>> source = inputChannel.getPlanSource();
 
         glutenPlan.setSources(List.of(source.f0));
         LOG.debug("Gluten Plan: {}", Serde.toJson(glutenPlan));
         query = new Query(glutenPlan, source.f1, Config.empty(), ConnectorConfig.empty());
-        outputChannel = new VectorToRowChannel(session.queryOps().execute(query),
+        outputChannel = new VectorToRowChannel(
+                executeSession.execute(query),
                 outputType,
                 output,
-                allocator);
+                executeSession.getAllocator());
     }
 
     @Override
@@ -112,7 +97,7 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
         inputChannel.pushOneRow(element);
         /*
          * There may be cases where all input data has been filtered out. In such scenarios, the
-         * process should immediately return and exit to prevent blocking the entire execution flow.
+         * process should immediately return to prevent blocking the entire execution flow.
          */
         outputChannel.tryFlush();
     }
@@ -120,11 +105,10 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
     @Override
     public void close() throws Exception {
         LOG.debug("close");
+        super.close();
         outputChannel.close();
         inputChannel.close();
-        session.close();
-        memoryManager.close();
-        allocator.close();
+        executeSession.close();
     }
 
     @Override
@@ -147,11 +131,13 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
         return id;
     }
 
-    // inish() typically precedes close().
+    // finish() typically precedes close().
     @Override
-    public void finish() {
+    public void finish() throws Exception {
         LOG.debug("finish");
+        super.finish();
         inputChannel.finish();
         outputChannel.finish();
+        executeSession.finish();
     }
 }

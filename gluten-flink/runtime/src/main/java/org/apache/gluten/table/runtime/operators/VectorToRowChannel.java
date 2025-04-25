@@ -79,6 +79,7 @@ public class VectorToRowChannel {
 
     public void finish() {
         LOG.debug("finish");
+        // In case there is still data not flushed
         forceFlush();
     }
 }
