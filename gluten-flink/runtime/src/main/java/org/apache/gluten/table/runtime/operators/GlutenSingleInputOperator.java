@@ -20,16 +20,13 @@ package org.apache.gluten.table.runtime.operators;
 import io.github.zhztheplayer.velox4j.connector.ExternalStream;
 import io.github.zhztheplayer.velox4j.connector.ExternalStreamConnectorSplit;
 import io.github.zhztheplayer.velox4j.connector.ExternalStreamTableHandle;
-<<<<<<< HEAD
-=======
-import io.github.zhztheplayer.velox4j.iterator.CloseableIterator;
-import io.github.zhztheplayer.velox4j.iterator.DownIterator;
->>>>>>> e1922386b (fix #18, Fetch the next output in non-blocking mode)
 import io.github.zhztheplayer.velox4j.iterator.DownIterators;
 import io.github.zhztheplayer.velox4j.iterator.UpIterator;
 import io.github.zhztheplayer.velox4j.query.BoundSplit;
 import io.github.zhztheplayer.velox4j.type.RowType;
 import org.apache.gluten.streaming.api.operators.GlutenOperator;
+import org.apache.gluten.table.runtime.operators.RowToVectorChannel;
+import org.apache.gluten.table.runtime.operators.VectorToRowChannel;
 import org.apache.gluten.vectorized.FlinkRowToVLVectorConvertor;
 
 import io.github.zhztheplayer.velox4j.Velox4j;
@@ -55,6 +52,8 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.ibm.icu.impl.Row;
+
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -64,57 +63,6 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
         implements OneInputStreamOperator<RowData, RowData>, GlutenOperator {
 
     private static final Logger LOG = LoggerFactory.getLogger(GlutenSingleInputOperator.class);
-
-    private class InputHanldler {
-        private BlockingQueue<RowVector> queue;
-        private final Session session;
-        private final RowType inputType;
-        private DownIterator inputIterator;
-        private ExternalStream externalStream;
-        private List<BoundSplit> splits;
-        private PlanNode sourceNode;
-
-        public InputHanldler(Session session, RowType inputType) {
-            this.session = session;
-            this.inputType = inputType;
-            this.queue = new LinkedBlockingQueue<>();
-
-            this.inputIterator = DownIterators.fromBlockingQueue(queue);
-            this.externalStream = session.externalStreamOps().bind(inputIterator);
-            this.splits = List.of(
-                    new BoundSplit(
-                            id,
-                            -1,
-                            new ExternalStreamConnectorSplit("connector-external-stream", externalStream.id())));
-            this.sourceNode = new TableScanNode(
-                    id,
-                    inputType,
-                    new ExternalStreamTableHandle("connector-external-stream"),
-                    List.of());
-        }
-
-        public void addInput(StreamRecord<RowData> element, BufferAllocator allocator) {
-            final RowVector rowVector = FlinkRowToVLVectorConvertor.fromRowData(
-                    element.getValue(),
-                    allocator,
-                    this.session,
-                    this.inputType);
-            queue.add(rowVector);
-        }
-
-        public Tuple2<PlanNode, List<BoundSplit>>  getSource() {
-            return new Tuple2<>(sourceNode, splits);
-        }
-
-        public void finish() {
-            inputIterator.finish();
-        }
-
-        public void close() {
-            externalStream.close();
-        }
-
-    };
 
     private final PlanNode glutenPlan;
     private final String id;
@@ -128,7 +76,8 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
     private Query query;
     BufferAllocator allocator;
     CloseableIterator<RowVector> outputIter;
-    private InputHanldler inputHanldler;
+    private RowToVectorChannel inputChannel;
+    private VectorToRowChannel outputChannel;
 
     public GlutenSingleInputOperator(PlanNode plan, String id, RowType inputType, RowType outputType) {
         this.glutenPlan = plan;
@@ -145,42 +94,34 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
         session = Velox4j.newSession(memoryManager);
 
         allocator = new RootAllocator(Long.MAX_VALUE);
-        inputHanldler = new InputHanldler(session, inputType);
-        Tuple2<PlanNode, List<BoundSplit>> source = inputHanldler.getSource();
+
+        inputChannel = new RowToVectorChannel(session, inputType, allocator, id);
+        Tuple2<PlanNode, List<BoundSplit>> source = inputChannel.getPlanSource();
+
         glutenPlan.setSources(List.of(source.f0));
         LOG.debug("Gluten Plan: {}", Serde.toJson(glutenPlan));
         query = new Query(glutenPlan, source.f1, Config.empty(), ConnectorConfig.empty());
-        outputIter = UpIterators.asJavaIterator(session.queryOps().execute(query));
+        outputChannel = new VectorToRowChannel(session.queryOps().execute(query),
+                outputType,
+                output,
+                allocator);
     }
 
     @Override
     public void processElement(StreamRecord<RowData> element) {
-        inputHanldler.addInput(element, allocator);
+        inputChannel.pushOneRow(element);
         /*
          * There may be cases where all input data has been filtered out. In such scenarios, the
          * process should immediately return and exit to prevent blocking the entire execution flow.
          */
-        flushOutput(false);
-    }
-
-    private void flushOutput(boolean blocking) {
-        while (outputIter.prepareNext(blocking)) {
-            final RowVector outRv = outputIter.next();
-            List<RowData> rows = FlinkRowToVLVectorConvertor.toRowData(
-                    outRv,
-                    allocator,
-                    outputType);
-            for (RowData row : rows) {
-                output.collect(outElement.replace(row));
-            }
-            outRv.close();
-        }
+        outputChannel.tryFlush();
     }
 
     @Override
     public void close() throws Exception {
-        outputIter.close();
-        inputHanldler.close();
+        LOG.debug("close");
+        outputChannel.close();
+        inputChannel.close();
         session.close();
         memoryManager.close();
         allocator.close();
@@ -209,7 +150,8 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
     // inish() typically precedes close().
     @Override
     public void finish() {
-        inputHanldler.finish();
-        flushOutput(true);
+        LOG.debug("finish");
+        inputChannel.finish();
+        outputChannel.finish();
     }
 }
