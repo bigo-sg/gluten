@@ -32,6 +32,7 @@ import io.github.zhztheplayer.velox4j.variant.VarBinaryValue;
 import io.github.zhztheplayer.velox4j.variant.VarCharValue;
 import io.github.zhztheplayer.velox4j.variant.Variant;
 import org.apache.calcite.rel.type.RelDataType;
+import io.github.zhztheplayer.velox4j.serde.Serde;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexFieldAccess;
 import org.apache.calcite.rex.RexInputRef;
@@ -40,13 +41,16 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.flink.table.planner.calcite.FlinkTypeFactory;
 import org.apache.gluten.util.LogicalTypeConverter;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
 /** Convertor to convert RexNode to velox TypedExpr */
 public class RexNodeConverter {
-
+    private static final Logger LOG = LoggerFactory.getLogger(RexNodeConverter.class);
     public static TypedExpr toTypedExpr(RexNode rexNode, List<String> inNames) {
         if (rexNode instanceof RexLiteral) {
             RexLiteral literal = (RexLiteral) rexNode;
@@ -56,12 +60,9 @@ public class RexNodeConverter {
                     null);
         } else if (rexNode instanceof RexCall) {
             RexCall rexCall = (RexCall) rexNode;
-            List<TypedExpr> params = toTypedExpr(rexCall.getOperands(), inNames);
-            Type nodeType = toType(rexCall.getType());
-            return new CallTypedExpr(
-                    nodeType,
-                    params,
-                    FunctionMappings.toVeloxFunction(rexCall.getOperator().getName()));
+            String operatorName = rexCall.getOperator().getName();
+            RexCallConverter converter = RexCallConverterFactory.getConverter(operatorName);
+            return converter.toTypedExpr(rexCall, inNames);
         } else if (rexNode instanceof RexInputRef) {
             RexInputRef inputRef = (RexInputRef) rexNode;
             return FieldAccessTypedExpr.create(
