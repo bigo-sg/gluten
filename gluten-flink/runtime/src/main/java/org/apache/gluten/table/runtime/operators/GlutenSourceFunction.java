@@ -99,6 +99,7 @@ public class GlutenSourceFunction extends RichParallelSourceFunction<RowData> {
             }
 
         }
+        upIterator.close();
         session.close();
         memoryManager.close();
         allocator.close();
