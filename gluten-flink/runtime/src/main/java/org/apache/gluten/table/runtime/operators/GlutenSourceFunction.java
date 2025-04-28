@@ -84,7 +84,7 @@ public class GlutenSourceFunction extends RichParallelSourceFunction<RowData> {
             if (state == UpIterator.State.AVAILABLE) {
                 final RowVector outRv = upIterator.get();
                 List<RowData> rows = FlinkRowToVLVectorConvertor.toRowData(
-                        upIterator.get(),
+                        outRv,
                         allocator,
                         outputType);
                 for (RowData row : rows) {
