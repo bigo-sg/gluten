@@ -36,40 +36,50 @@ import java.util.List;
 
 public class VectorToRowChannel {
     private static final Logger LOG = LoggerFactory.getLogger(VectorToRowChannel.class);
-    private CloseableIterator<RowVector> inputIterator;
+    private UpIterator inputIterator;
     private transient Output<StreamRecord<RowData>> output;
     private RowType rowType;
     private BufferAllocator allocator;
     private StreamRecord<RowData> outElement = null;
 
-    public VectorToRowChannel(UpIterator  inputIterator,
+    public VectorToRowChannel(UpIterator inputIterator,
             RowType rowType,
             Output<StreamRecord<RowData>> output,
             BufferAllocator allocator) {
-        this.inputIterator = UpIterators.asJavaIterator(inputIterator);
+        this.inputIterator = inputIterator;
         this.output = output;
         this.rowType = rowType;
         this.allocator = allocator;
         outElement = new StreamRecord<>(null);
     }
 
-    public void tryFlush() {
-        flushInternal(false);
+    public boolean flush() {
+        return flushInternal(false);
     }
 
-    public void forceFlush() {
-        flushInternal(true);
-    }
-
-    private void flushInternal(boolean force) {
-        while (inputIterator.hasNext(force)) {
-            final RowVector rowVector = inputIterator.next();
-            List<RowData> rows = FlinkRowToVLVectorConvertor.toRowData(rowVector, allocator, rowType);
-            for (RowData row : rows) {
-                output.collect(outElement.replace(row));
+    private boolean flushInternal(boolean blocking) {
+        boolean hasData = false;
+        while (true) {
+            UpIterator.State state = inputIterator.advance();
+            if (state == UpIterator.State.AVAILABLE) {
+                final RowVector rowVector = inputIterator.get();
+                List<RowData> rows = FlinkRowToVLVectorConvertor.toRowData(rowVector, allocator, rowType);
+                for (RowData row : rows) {
+                    output.collect(outElement.replace(row));
+                }
+                rowVector.close();
+                hasData = true;
+            } else if (state == UpIterator.State.BLOCKED) {
+                if (!blocking) {
+                    break;
+                }
+            } else if (state == UpIterator.State.FINISHED) {
+                break;
+            } else {
+                throw new IllegalStateException("Unexpected state: " + state);
             }
-            rowVector.close();
         }
+        return hasData;
     }
 
     public void close() throws Exception {
@@ -80,6 +90,6 @@ public class VectorToRowChannel {
     public void finish() {
         LOG.debug("finish");
         // In case there is still data not flushed
-        forceFlush();
+        flush();
     }
 }

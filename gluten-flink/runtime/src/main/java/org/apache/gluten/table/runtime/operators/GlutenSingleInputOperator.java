@@ -42,8 +42,6 @@ import io.github.zhztheplayer.velox4j.type.RowType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.ibm.icu.impl.Row;
-
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -99,7 +97,15 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
          * There may be cases where all input data has been filtered out. In such scenarios, the
          * process should immediately return to prevent blocking the entire execution flow.
          */
-        outputChannel.tryFlush();
+        if (outputChannel.flush()) {
+            /*
+             * If there is no data flushed, we cannot advance the input channel to release the
+             * input row vectors.
+             * This is a bug. It will be solve with latest velox4j, and we will remove this code
+             * In a good design, the resource should be released inside velox4j but not here.
+             */
+            inputChannel.advance();
+        }
     }
 
     @Override

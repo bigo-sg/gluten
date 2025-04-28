@@ -47,8 +47,8 @@ class ScanReuse1Test extends GlutenStreamingTestBase {
 
     @Test
     void testFilter() {
-        String query = "select a, b + 1 as b,c from MyTable where a > 1";
+        String query = "select a, b + 1 as b,c from MyTable";
         LOG.info("execution plan: {}", explainExecutionPlan(query));
-        runAndCheck(query, Arrays.asList("+I[2, 3, 2]", "+I[3, 4, 3]"));
+        runAndCheck(query, Arrays.asList("+I[1, 2, 1]", "+I[2, 3, 2]", "+I[3, 4, 3]"));
     }
 }

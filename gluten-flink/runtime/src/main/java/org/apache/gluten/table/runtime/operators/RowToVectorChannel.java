@@ -37,6 +37,7 @@ import org.apache.flink.table.data.RowData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -53,6 +54,8 @@ public class RowToVectorChannel {
     private ExternalStream externalStream;
     private List<BoundSplit> splits;
     private PlanNode sourceNode;
+    // Record all row vectors that need to be closed
+    private List<RowVector> pendingRowVectors = new LinkedList<> ();
 
     public RowToVectorChannel(Session session, RowType rowType, BufferAllocator allocator, String id) {
         this.session = session;
@@ -79,21 +82,36 @@ public class RowToVectorChannel {
     }
 
     public void pushOneRow(StreamRecord<RowData> element) {
-        final RowVector rowVector = FlinkRowToVLVectorConvertor.fromRowData(
+
+        RowVector prevRowVector = FlinkRowToVLVectorConvertor.fromRowData(
                 element.getValue(),
                 allocator,
                 this.session,
                 this.rowType);
-        queue.add(rowVector);
+        queue.add(prevRowVector);
+        pendingRowVectors.add(prevRowVector);
+    }
+
+    public void advance() {
+        // We can only close a row vector when it has been consumed from `queue`
+        // TODO: Updating to latest velox4j will solve this.
+        int n = pendingRowVectors.size() - queue.size();
+        for (int i = 0; i < n; i++) {
+            RowVector rowVector = pendingRowVectors.remove(0);
+            rowVector.close();
+        }
     }
 
     public void finish() {
         LOG.debug("finish");
-        inputIterator.finish();
+        // TODO: queue should have a close method
     }
 
     public void close() throws Exception {
         LOG.debug("close");
+        for (RowVector rowVector : pendingRowVectors) {
+            rowVector.close();
+        }
         externalStream.close();
     }
 }
