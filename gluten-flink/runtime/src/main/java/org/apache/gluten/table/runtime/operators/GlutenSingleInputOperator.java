@@ -17,33 +17,27 @@
 
 package org.apache.gluten.table.runtime.operators;
 
-import io.github.zhztheplayer.velox4j.connector.ExternalStream;
-import io.github.zhztheplayer.velox4j.connector.ExternalStreamConnectorSplit;
-import io.github.zhztheplayer.velox4j.connector.ExternalStreamTableHandle;
-import io.github.zhztheplayer.velox4j.iterator.DownIterators;
-import io.github.zhztheplayer.velox4j.iterator.UpIterator;
-import io.github.zhztheplayer.velox4j.query.BoundSplit;
-import io.github.zhztheplayer.velox4j.type.RowType;
 import org.apache.gluten.streaming.api.operators.GlutenOperator;
-import org.apache.gluten.vectorized.FlinkRowToVLVectorConvertor;
+import org.apache.gluten.table.runtime.operators.RowToVectorChannel;
+import org.apache.gluten.table.runtime.operators.VectorToRowChannel;
+import org.apache.gluten.table.runtime.operators.VeloxExecuteSession;
 
-import io.github.zhztheplayer.velox4j.Velox4j;
-import io.github.zhztheplayer.velox4j.config.Config;
-import io.github.zhztheplayer.velox4j.config.ConnectorConfig;
-import io.github.zhztheplayer.velox4j.data.RowVector;
-import io.github.zhztheplayer.velox4j.memory.AllocationListener;
-import io.github.zhztheplayer.velox4j.memory.MemoryManager;
-import io.github.zhztheplayer.velox4j.plan.PlanNode;
-import io.github.zhztheplayer.velox4j.plan.TableScanNode;
-import io.github.zhztheplayer.velox4j.query.Query;
-import io.github.zhztheplayer.velox4j.serde.Serde;
-import io.github.zhztheplayer.velox4j.session.Session;
-import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.memory.RootAllocator;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.runtime.operators.TableStreamOperator;
+
+import io.github.zhztheplayer.velox4j.Velox4j;
+import io.github.zhztheplayer.velox4j.config.Config;
+import io.github.zhztheplayer.velox4j.config.ConnectorConfig;
+import io.github.zhztheplayer.velox4j.plan.PlanNode;
+import io.github.zhztheplayer.velox4j.query.BoundSplit;
+import io.github.zhztheplayer.velox4j.query.Query;
+import io.github.zhztheplayer.velox4j.serde.Serde;
+import io.github.zhztheplayer.velox4j.session.Session;
+import io.github.zhztheplayer.velox4j.type.RowType;
+
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,14 +57,10 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
     private final RowType inputType;
     private final RowType outputType;
 
-    private StreamRecord<RowData> outElement = null;
-
-    private MemoryManager memoryManager;
-    private Session session;
     private Query query;
-    private BlockingQueue<RowVector> inputQueue;
-    BufferAllocator allocator;
-    UpIterator upIterator;
+    private RowToVectorChannel inputChannel;
+    private VectorToRowChannel outputChannel;
+    private VeloxExecuteSession executeSession;
 
     public GlutenSingleInputOperator(PlanNode plan, String id, RowType inputType, RowType outputType) {
         this.glutenPlan = plan;
@@ -82,60 +72,49 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
     @Override
     public void open() throws Exception {
         super.open();
-        outElement = new StreamRecord(null);
-        memoryManager = MemoryManager.create(AllocationListener.NOOP);
-        session = Velox4j.newSession(memoryManager);
+        executeSession = new VeloxExecuteSession();
 
-        inputQueue = new LinkedBlockingQueue<>();
-        ExternalStream es =
-                session.externalStreamOps().bind(DownIterators.fromBlockingQueue(inputQueue));
-        List<BoundSplit> splits = List.of(
-                new BoundSplit(
-                        id,
-                        -1,
-                        new ExternalStreamConnectorSplit("connector-external-stream", es.id())));
-        // add a mock input as velox not allow the source is empty.
-        PlanNode mockInput = new TableScanNode(
-                id,
+        inputChannel = new RowToVectorChannel(executeSession.getSession(),
                 inputType,
-                new ExternalStreamTableHandle("connector-external-stream"),
-                List.of());
-        glutenPlan.setSources(List.of(mockInput));
+                executeSession.getAllocator(),
+                id);
+        Tuple2<PlanNode, List<BoundSplit>> source = inputChannel.getPlanSource();
+
+        glutenPlan.setSources(List.of(source.f0));
         LOG.debug("Gluten Plan: {}", Serde.toJson(glutenPlan));
-        query = new Query(glutenPlan, splits, Config.empty(), ConnectorConfig.empty());
-        allocator = new RootAllocator(Long.MAX_VALUE);
-        upIterator = session.queryOps().execute(query);
+        query = new Query(glutenPlan, source.f1, Config.empty(), ConnectorConfig.empty());
+        outputChannel = new VectorToRowChannel(
+                executeSession.execute(query),
+                outputType,
+                output,
+                executeSession.getAllocator());
     }
 
     @Override
     public void processElement(StreamRecord<RowData> element) {
-        final RowVector inRv = FlinkRowToVLVectorConvertor.fromRowData(
-            element.getValue(),
-            allocator,
-            session,
-            inputType);
-        inputQueue.add(inRv);
-        UpIterator.State state = upIterator.advance();
-        if (state == UpIterator.State.AVAILABLE) {
-            RowVector outRv = upIterator.get();
-            List<RowData> rows = FlinkRowToVLVectorConvertor.toRowData(
-                    outRv,
-                    allocator,
-                    outputType);
-            for (RowData row : rows) {
-                output.collect(outElement.replace(row));
-            }
-            outRv.close();
+        inputChannel.pushOneRow(element);
+        /*
+         * There may be cases where all input data has been filtered out. In such scenarios, the
+         * process should immediately return to prevent blocking the entire execution flow.
+         */
+        if (outputChannel.flush()) {
+            /*
+             * If there is no data flushed, we cannot advance the input channel to release the
+             * input row vectors.
+             * This is a bug. It will be solve with latest velox4j, and we will remove this code
+             * In a good design, the resource should be released inside velox4j but not here.
+             */
+            inputChannel.advance();
         }
-        inRv.close();
     }
 
     @Override
     public void close() throws Exception {
-        upIterator.close();
-        session.close();
-        memoryManager.close();
-        allocator.close();
+        LOG.debug("close");
+        super.close();
+        outputChannel.close();
+        inputChannel.close();
+        executeSession.close();
     }
 
     @Override
@@ -156,5 +135,15 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
     @Override
     public String getId() {
         return id;
+    }
+
+    // finish() typically precedes close().
+    @Override
+    public void finish() throws Exception {
+        LOG.debug("finish");
+        super.finish();
+        inputChannel.finish();
+        outputChannel.finish();
+        executeSession.finish();
     }
 }
