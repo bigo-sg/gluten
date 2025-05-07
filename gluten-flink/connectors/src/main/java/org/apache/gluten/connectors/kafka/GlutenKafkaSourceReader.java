@@ -31,6 +31,7 @@ import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
 import org.apache.gluten.util.LogicalTypeConverter;
 import org.apache.gluten.vectorized.FlinkRowToVLVectorConvertor;
+import org.apache.gluten.table.runtime.operators.VeloxExecuteSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,15 +78,11 @@ public class GlutenKafkaSourceReader<T> implements SourceReader<T, KafkaPartitio
 
   private final String format;
 
-  private final MemoryManager memoryManager;
-
-  private final Session session;
+  private final VeloxExecuteSession session;
 
   private final DataType outputType;
 
   private final io.github.zhztheplayer.velox4j.type.Type veloxOutputType;
-
-  private final BufferAllocator allocator;
 
   private final List<KafkaPartitionSplit> topicPartitions;
 
@@ -106,9 +103,7 @@ public class GlutenKafkaSourceReader<T> implements SourceReader<T, KafkaPartitio
     this.outputType = outputType;
     this.veloxOutputType = LogicalTypeConverter.toVLType(outputType.getLogicalType());
     this.topicPartitions = new ArrayList<>();
-    this.memoryManager = MemoryManager.create(AllocationListener.NOOP);
-    this.session = Velox4j.newSession(memoryManager);
-    this.allocator = new RootAllocator(Long.MAX_VALUE);
+    this.session = new VeloxExecuteSession();
   }
 
   private KafkaConnectorSplit getConnectionSplit(Properties props) {
@@ -165,7 +160,7 @@ public class GlutenKafkaSourceReader<T> implements SourceReader<T, KafkaPartitio
   public InputStatus pollNext(ReaderOutput<T> output) throws Exception {
     if (running && result != null && result.hasNext()) {
       RowVector rowVector = result.next();
-      List<RowData> rows = FlinkRowToVLVectorConvertor.toRowData(rowVector, allocator, 
+      List<RowData> rows = FlinkRowToVLVectorConvertor.toRowData(rowVector, session.getAllocator(), 
         (io.github.zhztheplayer.velox4j.type.RowType) veloxOutputType);
       for (RowData row : rows) {
         output.collect((T) row);
@@ -188,7 +183,7 @@ public class GlutenKafkaSourceReader<T> implements SourceReader<T, KafkaPartitio
     TableScanNode kafkaScan = new TableScanNode(planNodeId,
         LogicalTypeConverter.toVLType(outputType.getLogicalType()), getTableHandle(), new ArrayList<>());
     query = new Query(kafkaScan, veloxSplits, Config.empty(), ConnectorConfig.empty());
-    result = UpIterators.asJavaIterator(session.queryOps().execute(query));
+    result = UpIterators.asJavaIterator(session.getSession().queryOps().execute(query));
   }
 
   @Override
@@ -208,9 +203,6 @@ public class GlutenKafkaSourceReader<T> implements SourceReader<T, KafkaPartitio
     }
     if (session != null) {
       session.close();
-    }
-    if (memoryManager != null) {
-      memoryManager.close();
     }
     if (topicPartitions != null) {
       topicPartitions.clear();
