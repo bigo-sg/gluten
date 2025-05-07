@@ -88,7 +88,6 @@ public class GlutenKafkaSource<OUT> implements Source<OUT, KafkaPartitionSplit, 
 
   @Override
   public SourceReader<OUT, KafkaPartitionSplit> createReader(SourceReaderContext readerContext) throws Exception {
-    LOG.info("planNodeId: {}", planNodeId);
     return new GlutenKafkaSourceReader<OUT>(planNodeId, format, outputType, properties);
   }
 

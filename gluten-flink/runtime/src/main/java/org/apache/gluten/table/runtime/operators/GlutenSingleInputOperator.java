@@ -55,7 +55,6 @@ public class GlutenSingleInputOperator extends TableStreamOperator<RowData>
     private VeloxExecuteSession executeSession;
 
     public GlutenSingleInputOperator(PlanNode plan, String id, RowType inputType, RowType outputType) {
-        LOG.info("call stack:{}", Arrays.asList(Thread.currentThread().getStackTrace()));
         this.glutenPlan = plan;
         this.id = id;
         this.inputType = inputType;
