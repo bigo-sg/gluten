@@ -153,21 +153,52 @@ public class GlutenKafkaDynamicSource extends KafkaDynamicSource{
 
   @Override
   public ScanRuntimeProvider getScanRuntimeProvider(ScanContext context) {
-    final DeserializationSchema<RowData> keyDeserialization = invokeMethodFromKafkaSource(this, "createDeserialization", 
-                  new Class<?>[] {DynamicTableSource.Context.class, DecodingFormat.class, int[].class, String.class}, 
-                  new Object[]{context, keyDecodingFormat, keyProjection, keyPrefix});
-    final DeserializationSchema<RowData> valueDeserialization = invokeMethodFromKafkaSource(this, "createDeserialization", 
-                  new Class<?>[] {DynamicTableSource.Context.class, DecodingFormat.class, int[].class, String.class}, 
-                  new Object[]{context, valueDecodingFormat, valueProjection, null});
+    final DeserializationSchema<RowData> keyDeserialization = invokeMethodFromKafkaSource(this, 
+                  "createDeserialization",
+                  new Class<?>[] {
+                    DynamicTableSource.Context.class,
+                    DecodingFormat.class,
+                    int[].class,
+                    String.class
+                  }, 
+                  new Object[]{context,
+                    keyDecodingFormat,
+                    keyProjection,
+                    keyPrefix});
+    final DeserializationSchema<RowData> valueDeserialization = invokeMethodFromKafkaSource(this, 
+                  "createDeserialization",
+                  new Class<?>[] {
+                    DynamicTableSource.Context.class,
+                    DecodingFormat.class,
+                    int[].class,
+                    String.class
+                  }, 
+                  new Object[]{
+                    context,
+                    valueDecodingFormat,
+                    valueProjection,
+                    null
+                  });
     final TypeInformation<RowData> producedTypeInfo = context.createTypeInformation(producedDataType);
     final KafkaRecordDeserializationSchema<RowData> deserializationSchema = 
-                KafkaRecordDeserializationSchema.of(invokeMethodFromKafkaSource(this, "createKafkaDeserializationSchema", 
-                  new Class<?>[] {DeserializationSchema.class, DeserializationSchema.class, TypeInformation.class},
-                  new Object[] {keyDeserialization, valueDeserialization, producedTypeInfo}));
+                KafkaRecordDeserializationSchema.of(invokeMethodFromKafkaSource(this, 
+                "createKafkaDeserializationSchema",
+                  new Class<?>[] {
+                    DeserializationSchema.class,
+                    DeserializationSchema.class,
+                    TypeInformation.class
+                  },
+                  new Object[] {
+                    keyDeserialization,
+                    valueDeserialization,
+                    producedTypeInfo
+                  }));
     final KafkaSource<RowData> kafkaSource = createKafkaSource(keyDeserialization, valueDeserialization, producedTypeInfo);
     KafkaSubscriber subscriber = getFieldFromKafkaSource(kafkaSource, "subscriber", KafkaSubscriber.class);
-    OffsetsInitializer startOffsetsInitializer = getFieldFromKafkaSource(kafkaSource, "startingOffsetsInitializer", OffsetsInitializer.class);
-    OffsetsInitializer stopOffsetsInitializer = getFieldFromKafkaSource(kafkaSource, "stoppingOffsetsInitializer", OffsetsInitializer.class);
+    OffsetsInitializer startOffsetsInitializer = getFieldFromKafkaSource(kafkaSource, 
+              "startingOffsetsInitializer", OffsetsInitializer.class);
+    OffsetsInitializer stopOffsetsInitializer = getFieldFromKafkaSource(kafkaSource, 
+              "stoppingOffsetsInitializer", OffsetsInitializer.class);
     final GlutenKafkaSource<RowData> glutenKafkaSource = 
                   new GlutenKafkaSource<RowData>("", 
                   getFormat(valueDeserialization), 
