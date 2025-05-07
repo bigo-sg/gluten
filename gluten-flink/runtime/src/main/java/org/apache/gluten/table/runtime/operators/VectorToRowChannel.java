@@ -18,9 +18,7 @@
 package org.apache.gluten.table.runtime.operators;
 
 import io.github.zhztheplayer.velox4j.data.RowVector;
-import io.github.zhztheplayer.velox4j.iterator.CloseableIterator;
 import io.github.zhztheplayer.velox4j.iterator.UpIterator;
-import io.github.zhztheplayer.velox4j.iterator.UpIterators;
 import io.github.zhztheplayer.velox4j.type.RowType;
 
 import org.apache.arrow.memory.BufferAllocator;

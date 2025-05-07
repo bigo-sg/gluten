@@ -224,10 +224,6 @@ public class FlinkRowToVLVectorConvertor {
             RowVector rowVector,
             BufferAllocator allocator,
             RowType rowType) {
-        final BaseVector loadedVector = rowVector.loadedVector();
-        final FieldVector fieldVector = Arrow.toArrowVector(
-                allocator,
-                loadedVector);
         if (rowVector.getSize() == 0) {
             return new ArrayList<>();
         }

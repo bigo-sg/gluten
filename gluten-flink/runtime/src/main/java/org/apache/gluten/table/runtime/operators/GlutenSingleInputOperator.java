@@ -21,8 +21,6 @@ import io.github.zhztheplayer.velox4j.type.RowType;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.gluten.streaming.api.operators.GlutenOperator;
-import org.apache.flink.api.java.tuple.Tuple2;
-import io.github.zhztheplayer.velox4j.Velox4j;
 import io.github.zhztheplayer.velox4j.config.Config;
 import io.github.zhztheplayer.velox4j.config.ConnectorConfig;
 import io.github.zhztheplayer.velox4j.plan.PlanNode;
