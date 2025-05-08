@@ -168,7 +168,7 @@ public class FlinkRowToVLVectorConvertor {
         } else if (fieldVector instanceof TimeStampVector) {
             /// Todo: consider about timezone 
             long timestamp = ((TimeStampVector) fieldVector).get(fieldIndex);
-            return TimestampData.fromEpochMillis(timestamp / 1000);
+            return TimestampData.fromEpochMillis(timestamp);
         } else if (fieldVector instanceof VarCharVector) {
             byte[] bytes = ((VarCharVector) fieldVector).get(fieldIndex);
             BinaryStringData s = BinaryStringData.fromBytes(bytes);
