@@ -188,7 +188,7 @@ public class GlutenKafkaSourceReader<T> implements SourceReader<T, KafkaPartitio
 
   @Override
   public List<KafkaPartitionSplit> snapshotState(long checkpointId) {
-    throw new RuntimeException("Not implements");
+    throw new RuntimeException("Not implemented");
   }
 
   @Override
