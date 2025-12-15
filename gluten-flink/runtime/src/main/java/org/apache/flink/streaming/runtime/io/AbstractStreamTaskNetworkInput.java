@@ -234,7 +234,7 @@ public abstract class AbstractStreamTaskNetworkInput<
   public void close() throws IOException {
     // --- Begin Gluten-specific code changes ---
     if (inputSerializer instanceof Closeable) {
-      // GlutenRowVectorSerializer need to release native resources.
+      // GlutenStatefulRecordSerializer need to release native resources.
       ((Closeable) inputSerializer).close();
     }
     // --- End Gluten-specific code changes ---

@@ -23,7 +23,7 @@ import org.apache.gluten.table.runtime.keyselector.GlutenKeySelector;
 import org.apache.gluten.table.runtime.operators.GlutenVectorOneInputOperator;
 import org.apache.gluten.table.runtime.operators.GlutenVectorSourceFunction;
 import org.apache.gluten.table.runtime.operators.GlutenVectorTwoInputOperator;
-import org.apache.gluten.table.runtime.typeutils.GlutenRowVectorSerializer;
+import org.apache.gluten.table.runtime.typeutils.GlutenStatefulRecordSerializer;
 import org.apache.gluten.util.Utils;
 
 import io.github.zhztheplayer.velox4j.plan.StatefulPlanNode;
@@ -132,7 +132,7 @@ public class StreamGraphTranslator implements FlinkPipelineTranslator {
       // TODO: judge whether can set?
       if (isSourceGluten) {
         if (taskConfig.getOperatorName().equals("exchange-hash")) {
-          taskConfig.setTypeSerializerOut(new GlutenRowVectorSerializer(null));
+          taskConfig.setTypeSerializerOut(new GlutenStatefulRecordSerializer(null));
         }
         Map<IntermediateDataSetID, String> nodeToNonChainedOuts = new HashMap<>(outEdges.size());
         taskConfig
@@ -216,14 +216,14 @@ public class StreamGraphTranslator implements FlinkPipelineTranslator {
         taskConfig.setStatePartitioner(0, new GlutenKeySelector());
         taskConfig.setStatePartitioner(1, new GlutenKeySelector());
         taskConfig.setupNetworkInputs(
-            new GlutenRowVectorSerializer(null), new GlutenRowVectorSerializer(null));
+            new GlutenStatefulRecordSerializer(null), new GlutenStatefulRecordSerializer(null));
       } else {
         taskConfig.setStreamOperator(
             new GlutenVectorOneInputOperator(
                 sourceNode, sourceOperator.getId(), sourceOperator.getInputType(), nodeToOutTypes));
         // TODO: judge whether can set?
         taskConfig.setStatePartitioner(0, new GlutenKeySelector());
-        taskConfig.setupNetworkInputs(new GlutenRowVectorSerializer(null));
+        taskConfig.setupNetworkInputs(new GlutenStatefulRecordSerializer(null));
       }
       Utils.setNodeToChainedOutputs(taskConfig, nodeToChainedOuts);
       Utils.setNodeToNonChainedOutputs(taskConfig, nodeToNonChainedOuts);
