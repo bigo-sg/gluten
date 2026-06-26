@@ -116,3 +116,7 @@ test:
   script:
     - cd $CI_PROJECT_DIR/gluten-flink
     - $CI_PROJECT_DIR/build/mvn test
+
+tags:
+    - gluten-flink
+
