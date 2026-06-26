@@ -40,6 +40,10 @@ variables:
     --add-opens=java.base/jdk.internal.ref=ALL-UNNAMED
   CCACHE_DIR: "$CI_PROJECT_DIR/.ccache"
 
+default:
+  tags:
+    - gluten-flink
+
 stages:
   - prepare
   - build
@@ -117,6 +121,5 @@ test:
     - cd $CI_PROJECT_DIR/gluten-flink
     - $CI_PROJECT_DIR/build/mvn test
 
-tags:
-    - gluten-flink
+
 
