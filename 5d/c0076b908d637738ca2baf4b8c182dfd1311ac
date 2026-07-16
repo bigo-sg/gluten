@@ -1,0 +1,90 @@
+cpp/velox/shuffle/VeloxShuffleWriter.cc
+  s_c6f131a590bd51::t_a682b4083d0170 34
+gluten-ut/spark40/src/test/scala/org/apache/spark/sql/execution/GlutenRemoveRedundantSortsSuite.scala
+  s_c6f131a590bd51::t_a682b4083d0170 19-20,22-172
+gluten-core/src/main/scala/org/apache/gluten/execution/GlutenPlan.scala
+  s_c6f131a590bd51::t_a682b4083d0170 28
+cpp/velox/substrait/SubstraitToVeloxPlan.cc
+  s_c6f131a590bd51::t_a682b4083d0170 502
+.github/dependabot.yml
+  s_c6f131a590bd51::t_a682b4083d0170 1-29
+cpp/velox/shuffle/VeloxShuffleWriter.h
+  s_c6f131a590bd51::t_a682b4083d0170 148-149
+gluten-core/src/main/scala/org/apache/spark/task/TaskResources.scala
+  s_c6f131a590bd51::t_a682b4083d0170 107-108
+gluten-flink/docs/Flink.md
+  s_c6f131a590bd51::t_a682b4083d0170 51
+cpp/velox/tests/VeloxShuffleWriterTestBase.h
+  s_c6f131a590bd51::t_a682b4083d0170 109-119,151,165-166,169-195,206-207,212,216,223-224,229,249-250,291-292,300-301
+cpp/velox/shuffle/VeloxHashShuffleWriter.cc
+  s_c6f131a590bd51::t_a682b4083d0170 876,880-882
+cpp/velox/tests/VeloxGpuShuffleWriterTest.cc
+  s_c6f131a590bd51::t_a682b4083d0170 23,229
+gluten-ut/spark41/src/test/scala/org/apache/spark/sql/execution/GlutenWholeStageCodegenSuite.scala
+  s_c6f131a590bd51::t_a682b4083d0170 19-20,22-763
+cpp/velox/substrait/SubstraitToVeloxPlanValidator.cc
+  s_c6f131a590bd51::t_a682b4083d0170 255-256,269-271,274,289-300,303-306
+gluten-core/src/main/scala/org/apache/gluten/extension/columnar/transition/package.scala
+  s_c6f131a590bd51::t_a682b4083d0170 37
+gluten-core/src/main/scala/org/apache/spark/util/SparkPlanUtil.scala
+  s_c6f131a590bd51::t_a682b4083d0170 26
+gluten-flink/runtime/src/main/java/org/apache/gluten/table/runtime/operators/GlutenOneInputOperator.java
+  s_c6f131a590bd51::t_a682b4083d0170 334,336-339,341,344-348
+gluten-core/src/main/java/org/apache/gluten/memory/memtarget/DynamicOffHeapSizingMemoryTarget.java
+  s_c6f131a590bd51::t_a682b4083d0170 108-119
+gluten-ut/spark40/src/test/scala/org/apache/spark/sql/connector/GlutenGroupBasedUpdateTableSuite.scala
+  s_c6f131a590bd51::t_a682b4083d0170 19,24-49
+cpp/velox/tests/VeloxShuffleWriterTest.cc
+  s_c6f131a590bd51::t_a682b4083d0170 912-913,962
+cpp/velox/tests/VeloxRssSortShuffleWriterTest.cc
+  s_c6f131a590bd51::t_a682b4083d0170 47,68-84,90-97,99-105,108-110,113-117,119-122,125-126,128-131,133-136,139-143,145-148,151,153-157
+gluten-flink/ut/src/test/java/org/apache/gluten/table/runtime/operators/GlutenStreamingFileWriterOperatorTest.java
+  s_c6f131a590bd51::t_a682b4083d0170 17,19-24,26-32,34-57,60-73,76-79,81-123
+cpp/velox/shuffle/VeloxRssSortShuffleWriter.cc
+  s_c6f131a590bd51::t_a682b4083d0170 222-223
+gluten-ut/spark41/src/test/scala/org/apache/gluten/utils/velox/VeloxTestSettings.scala
+  s_c6f131a590bd51::t_a682b4083d0170 277-279,720-722,728,742-769
+cpp/velox/shuffle/VeloxSortShuffleWriter.cc
+  s_c6f131a590bd51::t_a682b4083d0170 124,126-127
+gluten-ut/spark40/src/test/scala/org/apache/spark/sql/execution/GlutenSQLViewSuite.scala
+  s_c6f131a590bd51::t_a682b4083d0170 19,22-40
+gluten-ut/spark41/src/test/scala/org/apache/spark/sql/execution/GlutenRemoveRedundantSortsSuite.scala
+  s_c6f131a590bd51::t_a682b4083d0170 19-20,22-172
+cpp/velox/memory/GpuBufferColumnarBatch.cc
+  s_c6f131a590bd51::t_a682b4083d0170 31,70,72,74,79-83,93,99,105,108-117,122-123,138-139,164-183,186,188,191,195,201-202,204
+gluten-flink/runtime/src/main/java/org/apache/gluten/table/runtime/operators/GlutenStreamingFileWriterOperator.java
+  s_c6f131a590bd51::t_a682b4083d0170 25-26,28-29,33-38,43-49,73-106
+gluten-ut/spark41/src/test/scala/org/apache/spark/sql/execution/GlutenSQLViewSuite.scala
+  s_c6f131a590bd51::t_a682b4083d0170 19,22-40
+gluten-ut/spark40/src/test/scala/org/apache/spark/sql/execution/GlutenWholeStageCodegenSuite.scala
+  s_c6f131a590bd51::t_a682b4083d0170 19-20,22-763
+gluten-ut/spark41/src/test/scala/org/apache/spark/sql/connector/GlutenGroupBasedUpdateTableSuite.scala
+  s_c6f131a590bd51::t_a682b4083d0170 19,24-49
+ep/build-velox/src/get-velox.sh
+  s_c6f131a590bd51::t_a682b4083d0170 21-22
+cpp/core/jni/JniWrapper.cc
+  s_c6f131a590bd51::t_a682b4083d0170 1051
+backends-velox/src-iceberg/test/scala/org/apache/gluten/execution/enhanced/VeloxIcebergSuite.scala
+  s_c6f131a590bd51::t_a682b4083d0170 656-658
+gluten-ut/spark40/src/test/scala/org/apache/gluten/utils/velox/VeloxTestSettings.scala
+  s_c6f131a590bd51::t_a682b4083d0170 268-270,741-743,749,763-790
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "5dc0076b908d637738ca2baf4b8c182dfd1311ac",
+  "prompts": {},
+  "logical_commit_id": "5dc0076b908d637738ca2baf4b8c182dfd1311ac",
+  "sessions": {
+    "s_c6f131a590bd51": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0a6d06d4cffeYJBeS1oC4YZoA9",
+        "model": "glm-5.2"
+      },
+      "human_author": "lgbo-ustc <lgbo.ustc@gmail.com>",
+      "total_additions": 2425,
+      "total_deletions": 414
+    }
+  }
+}
