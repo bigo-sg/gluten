@@ -180,6 +180,7 @@ set(VELOX_SRCS
     operators/functions/SparkExprToSubfieldFilterParser.cc
     operators/plannodes/RowVectorStream.cc
     operators/hashjoin/HashTableBuilder.cc
+    operators/hashjoin/HashTableSerializer.cc
     operators/reader/FileReaderIterator.cc
     operators/reader/ParquetReaderIterator.cc
     operators/serializer/VeloxColumnarBatchSerializer.cc
@@ -188,6 +189,7 @@ set(VELOX_SRCS
     operators/writer/VeloxColumnarBatchWriter.cc
     operators/writer/VeloxParquetDataSource.cc
     shuffle/ArrowShuffleDictionaryWriter.cc
+    shuffle/ReaderThreadPool.cc
     shuffle/VeloxHashShuffleWriter.cc
     shuffle/VeloxRssSortShuffleWriter.cc
     shuffle/VeloxShuffleReader.cc
@@ -223,17 +225,15 @@ if(ENABLE_GPU)
     cudf/CudfPlanValidator.cc
     cudf/GpuLock.cc
     operators/plannodes/CudfVectorStream.cc
+    shuffle/VeloxGpuAsyncShuffleReader.cc
     shuffle/VeloxGpuShuffleReader.cc
-    shuffle/VeloxGpuShuffleWriter.cc
     operators/serializer/VeloxGpuColumnarBatchSerializer.cc
     utils/GpuBufferBatchResizer.cc
     memory/GpuBufferColumnarBatch.cc)
 endif()
 
-if(ENABLE_ENHANCED_FEATURES)
-  list(APPEND VELOX_SRCS compute/iceberg/IcebergFormat.cc
-       compute/iceberg/IcebergWriter.cc)
-endif()
+list(APPEND VELOX_SRCS compute/iceberg/IcebergFormat.cc
+     compute/iceberg/IcebergWriter.cc)
 
 if(BUILD_TESTS OR BUILD_BENCHMARKS)
   set(BUILD_TEST_UTILS ON)
@@ -263,6 +263,12 @@ if(ENABLE_GLUTEN_VCPKG AND NOT CMAKE_SYSTEM_NAME MATCHES "Darwin")
   target_link_options(
     velox PRIVATE -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/symbols.map)
 endif()
+if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+  # Make libvelox.dylib own the Velox mono archive. Test utilities can then
+  # resolve Velox symbols from the dylib instead of linking a second copy.
+  target_link_options(velox PRIVATE
+                      "LINKER:-force_load,${VELOX_BUILD_PATH}/lib/libvelox.a")
+endif()
 
 find_protobuf()
 message(STATUS "Found Protobuf: ${PROTOBUF_LIBRARY}")
@@ -290,6 +296,9 @@ target_include_directories(
          ${VELOX_HOME}
          ${PROTO_OUTPUT_DIR}
          ${PROTOBUF_INCLUDE})
+if(GLUTEN_PREFIX_INCLUDE_DIRS)
+  target_include_directories(velox BEFORE PUBLIC ${GLUTEN_PREFIX_INCLUDE_DIRS})
+endif()
 
 set_target_properties(velox PROPERTIES LIBRARY_OUTPUT_DIRECTORY
                                        ${root_directory}/releases)
@@ -309,6 +318,10 @@ target_link_libraries(velox PUBLIC gluten)
 
 # Requires VELOX_MONO_LIBRARY=ON when building Velox.
 import_library(facebook::velox ${VELOX_BUILD_PATH}/lib/libvelox.a)
+set(GLUTEN_VELOX_LINK_SCOPE PUBLIC)
+if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+  set(GLUTEN_VELOX_LINK_SCOPE PRIVATE)
+endif()
 
 if(BUILD_TESTS)
   add_duckdb()
@@ -338,7 +351,7 @@ if(BUILD_TESTS)
   target_link_libraries(velox PUBLIC facebook::velox::exec_test_lib)
 endif()
 
-target_link_libraries(velox PUBLIC facebook::velox)
+target_link_libraries(velox ${GLUTEN_VELOX_LINK_SCOPE} facebook::velox)
 
 target_link_libraries(velox PUBLIC ${GLUTEN_ROARING_LINK_LIBRARY})
 
@@ -386,6 +399,24 @@ target_link_libraries(velox PUBLIC external::veloxthrift)
 # `-DCMAKE_PREFIX_PATH="${folly lib path}" to cmake arguments. It is also
 # applicable to other dependencies.
 find_package(Folly REQUIRED CONFIG)
+if(CMAKE_SYSTEM_NAME MATCHES "Darwin" AND TARGET gflags_shared)
+  # Folly's exported interface references the static gflags target while glog
+  # links the shared gflags library. Loading both copies into one process makes
+  # gflags register its built-in flags twice and abort test binaries. Point
+  # folly's interface at the shared gflags target instead.
+  foreach(FOLLY_TARGET Folly::folly Folly::folly_deps)
+    if(TARGET ${FOLLY_TARGET})
+      get_target_property(FOLLY_LINK_LIBS ${FOLLY_TARGET}
+                          INTERFACE_LINK_LIBRARIES)
+      if(FOLLY_LINK_LIBS MATCHES "gflags_static")
+        list(TRANSFORM FOLLY_LINK_LIBS REPLACE "gflags_static" "gflags_shared")
+        set_target_properties(
+          ${FOLLY_TARGET} PROPERTIES INTERFACE_LINK_LIBRARIES
+                                     "${FOLLY_LINK_LIBS}")
+      endif()
+    endif()
+  endforeach()
+endif()
 target_link_libraries(velox PUBLIC Folly::folly)
 
 # Link thrift libraries - check vcpkg first, then fall back to system libraries
@@ -413,16 +444,26 @@ if(DEFINED VCPKG_INSTALLED_DIR
     PRIVATE ${VCPKG_INSTALLED_DIR}/${VCPKG_TRIPLET_DIR}/lib/libthriftcpp2.a
             ${VCPKG_INSTALLED_DIR}/${VCPKG_TRIPLET_DIR}/lib/libthriftprotocol.a)
 else()
-  message(STATUS "Using system thrift libraries from /usr/local/lib")
+  set(THRIFT_LIBRARY_DIRS)
+  if(CMAKE_INSTALL_PREFIX)
+    list(APPEND THRIFT_LIBRARY_DIRS "${CMAKE_INSTALL_PREFIX}/lib")
+  endif()
+  foreach(PREFIX_PATH IN LISTS CMAKE_PREFIX_PATH)
+    list(APPEND THRIFT_LIBRARY_DIRS "${PREFIX_PATH}/lib" "${PREFIX_PATH}")
+  endforeach()
+  list(APPEND THRIFT_LIBRARY_DIRS /usr/local/lib)
+  list(REMOVE_DUPLICATES THRIFT_LIBRARY_DIRS)
+
+  message(STATUS "Searching thrift libraries in ${THRIFT_LIBRARY_DIRS}")
   find_library(
     THRIFTCPP2_LIB
     NAMES thriftcpp2
-    PATHS /usr/local/lib
+    PATHS ${THRIFT_LIBRARY_DIRS}
     NO_DEFAULT_PATH)
   find_library(
     THRIFTPROTOCOL_LIB
     NAMES thriftprotocol
-    PATHS /usr/local/lib
+    PATHS ${THRIFT_LIBRARY_DIRS}
     NO_DEFAULT_PATH)
 
   if(THRIFTCPP2_LIB AND THRIFTPROTOCOL_LIB)
@@ -546,13 +587,15 @@ if(ENABLE_GPU)
            velox_curl)
 endif()
 
-add_custom_command(
-  TARGET velox
-  POST_BUILD
-  COMMAND ld $<TARGET_FILE:velox> || true
-  COMMENT "Checking ld result of libvelox.so")
-add_custom_command(
-  TARGET velox
-  POST_BUILD
-  COMMAND ldd $<TARGET_FILE:velox> || true
-  COMMENT "Checking ldd result of libvelox.so")
+if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+  add_custom_command(
+    TARGET velox
+    POST_BUILD
+    COMMAND ld $<TARGET_FILE:velox> || true
+    COMMENT "Checking ld result of libvelox.so")
+  add_custom_command(
+    TARGET velox
+    POST_BUILD
+    COMMAND ldd $<TARGET_FILE:velox> || true
+    COMMENT "Checking ldd result of libvelox.so")
+endif()

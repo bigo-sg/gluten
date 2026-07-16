@@ -113,6 +113,13 @@ class VeloxConfig(conf: SQLConf) extends GlutenConfig(conf) {
     getConf(VALUE_STREAM_DYNAMIC_FILTER_ENABLED)
 
   def enableTimestampNtzValidation: Boolean = getConf(ENABLE_TIMESTAMP_NTZ_VALIDATION)
+
+  def enableDriverSideBroadcastHashTableBuild: Boolean =
+    getConf(VELOX_DRIVER_SIDE_BROADCAST_HASH_TABLE_BUILD)
+
+  def enableGpuAsyncShuffleReader: Boolean = getConf(ENABLE_GPU_ASYNC_SHUFFLE_READER)
+
+  def gpuAsyncReaderMaxPrefetchBytes: Long = getConf(GPU_ASYNC_SHUFFLE_READER_MAX_PREFETCH_BYTES)
 }
 
 object VeloxConfig extends ConfigRegistry {
@@ -597,6 +604,26 @@ object VeloxConfig extends ConfigRegistry {
       .stringConf
       .createWithDefault("legacy")
 
+  val S3_UPLOAD_PART_ASYNC =
+    buildStaticConf("spark.gluten.velox.s3UploadPartAsync")
+      .doc("If true, S3 multipart upload parts are uploaded asynchronously.")
+      .booleanConf
+      .createWithDefault(false)
+
+  val S3_MAX_CONCURRENT_UPLOAD_NUM =
+    buildStaticConf("spark.gluten.velox.s3MaxConcurrentUploadNum")
+      .doc("The maximum number of in-flight S3 part uploads per file.")
+      .intConf
+      .checkValue(_ > 0, "must be a positive number")
+      .createWithDefault(4)
+
+  val S3_UPLOAD_THREADS =
+    buildStaticConf("spark.gluten.velox.s3UploadThreads")
+      .doc("The number of shared S3 part upload threads.")
+      .intConf
+      .checkValue(_ > 0, "must be a positive number")
+      .createWithDefault(16)
+
   val VELOX_ORC_SCAN_ENABLED =
     buildConf("spark.gluten.sql.columnar.backend.velox.orc.scan.enabled")
       .doc("Enable velox orc scan. If disabled, vanilla spark orc scan will be used.")
@@ -630,6 +657,15 @@ object VeloxConfig extends ConfigRegistry {
           "peak memory and is not suitable for very large broadcasts.")
       .booleanConf
       .createWithDefault(false)
+
+  val COLUMNAR_VELOX_BATCH_SERIALIZER_COMPRESSION =
+    buildConf("spark.gluten.sql.columnar.backend.velox.columnarBatchSerializerCompression")
+      .internal()
+      .doc("which compression for the columnar batch serializer (e.g. broadcast).")
+      .stringConf
+      .transform(_.toLowerCase(Locale.ROOT))
+      .checkValues(Set("none", "zstd", "zlib", "snappy", "lz4", "gzip"))
+      .createWithDefault("none")
 
   val VELOX_HASHMAP_ABANDON_BUILD_DUPHASH_MIN_ROWS =
     buildConf("spark.gluten.velox.abandonDedupHashMap.minRows")
@@ -672,6 +708,15 @@ object VeloxConfig extends ConfigRegistry {
           "the hash table is rebuilt for each task.")
       .booleanConf
       .createWithDefault(true)
+
+  val VELOX_DRIVER_SIDE_BROADCAST_HASH_TABLE_BUILD =
+    buildConf("spark.gluten.sql.columnar.backend.velox.driverSideBroadcastHashTableBuild")
+      .doc(
+        "Enable driver-side broadcast hash table build. When enabled, the hash table is " +
+          "built and serialized on the driver, then broadcast to executors. When disabled, " +
+          "each executor builds its own hash table from the broadcast data.")
+      .booleanConf
+      .createWithDefault(false)
 
   val QUERY_TRACE_ENABLED = buildConf("spark.gluten.sql.columnar.backend.velox.queryTraceEnabled")
     .doc("Enable query tracing flag.")
@@ -758,6 +803,12 @@ object VeloxConfig extends ConfigRegistry {
       .booleanConf
       .createWithDefault(true)
 
+  val CUDF_ALLOW_CPU_FALLBACK =
+    buildStaticConf("spark.gluten.sql.columnar.backend.velox.cudf.allowCpuFallback")
+      .doc("Allow cuDF to fall back to CPU execution for unsupported operators.")
+      .booleanConf
+      .createWithDefault(true)
+
   val CUDF_CONCURRENT_GPU_TASKS =
     buildStaticConf("spark.gluten.sql.columnar.backend.velox.cudf.concurrentGpuTasks")
       .doc("The number of concurrent GPU tasks to run.")
@@ -841,6 +892,12 @@ object VeloxConfig extends ConfigRegistry {
       .bytesConf(ByteUnit.BYTE)
       .createWithDefaultString("1MB")
 
+  val PARQUET_DICT_SIZE_BYTES =
+    buildConf("spark.gluten.sql.columnar.backend.velox.parquet.dictionaryPageSizeBytes")
+      .doc("The maximum size in bytes for a Parquet dictionary page")
+      .bytesConf(ByteUnit.BYTE)
+      .createWithDefaultString("2MB")
+
   val ENABLE_TIMESTAMP_NTZ_VALIDATION =
     buildConf("spark.gluten.sql.columnar.backend.velox.enableTimestampNtzValidation")
       .doc(
@@ -849,4 +906,32 @@ object VeloxConfig extends ConfigRegistry {
           "allows native execution for TimestampNTZ scan.")
       .booleanConf
       .createWithDefault(false)
+
+  val ENABLE_GPU_ASYNC_SHUFFLE_READER =
+    buildConf("spark.gluten.sql.columnar.backend.velox.gpuAsyncShuffleReader.enabled")
+      .doc(
+        "Experimental: Enable GPU async shuffle reader. " +
+          "When true, the gpu shuffle reader will use a thread pool " +
+          "to read and deserialize the input streams. " +
+          "When false, the shuffle reader will execute in the current thread.")
+      .booleanConf
+      .createWithDefault(false)
+
+  val GPU_ASYNC_SHUFFLE_READER_THREAD_POOL_SIZE =
+    buildStaticConf("spark.gluten.sql.columnar.backend.velox.gpuAsyncShuffleReader.threadPoolSize")
+      .doc(
+        "The number of threads used by GPU async shuffle reader for decompressing " +
+          "and deserializing input streams.")
+      .intConf
+      .checkValue(_ > 0, "The thread pool size must be greater than 0.")
+      .createWithDefault(1)
+
+  val GPU_ASYNC_SHUFFLE_READER_MAX_PREFETCH_BYTES =
+    buildConf(
+      "spark.gluten.sql.columnar.backend.velox.gpuAsyncShuffleReader.maxPrefetchBytes")
+      .doc(
+        "The maximum number of bytes to prefetch in CPU memory during GPU async shuffle read.")
+      .bytesConf(ByteUnit.BYTE)
+      .checkValue(_ > 0, "The max prefetch bytes must be greater than 0.")
+      .createWithDefaultString("1GB")
 }

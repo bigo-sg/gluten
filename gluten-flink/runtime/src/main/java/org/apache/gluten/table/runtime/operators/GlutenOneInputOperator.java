@@ -43,6 +43,7 @@ import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
+import org.apache.flink.streaming.runtime.watermarkstatus.WatermarkStatus;
 import org.apache.flink.table.runtime.operators.TableStreamOperator;
 
 import java.util.List;
@@ -120,7 +121,7 @@ public class GlutenOneInputOperator<IN, OUT> extends TableStreamOperator<OUT>
       outputBridge = VectorOutputBridge.Factory.create(outClass);
     }
     sessionResource = new GlutenSessionResource();
-    GlutenSessionResources.getInstance().addSessionResource(id, sessionResource);
+    GlutenTaskSessionContext.addSessionResource(id, sessionResource);
     inputQueue = sessionResource.getSession().externalStreamOps().newBlockingQueue();
     // add a mock input as velox not allow the source is empty.
     if (inputType == null) {
@@ -223,6 +224,9 @@ public class GlutenOneInputOperator<IN, OUT> extends TableStreamOperator<OUT>
           if (statefulElement.isWatermark()) {
             StatefulWatermark watermark = statefulElement.asWatermark();
             output.emitWatermark(new Watermark(watermark.getTimestamp()));
+          } else if (statefulElement.isWatermarkStatus()) {
+            output.emitWatermarkStatus(
+                GlutenWatermarkStatuses.toFlinkWatermarkStatus(statefulElement));
           } else {
             outputBridge.collect(
                 output, statefulElement.asRecord(), sessionResource.getAllocator(), outputType);
@@ -246,6 +250,12 @@ public class GlutenOneInputOperator<IN, OUT> extends TableStreamOperator<OUT>
   public void processWatermark(Watermark mark) throws Exception {
     task.notifyWatermark(mark.getTimestamp());
     // Process any pending elements to ensure watermark-triggered operations complete.
+    processElementInternal();
+  }
+
+  @Override
+  public void processWatermarkStatus(WatermarkStatus status) throws Exception {
+    task.notifyWatermarkStatus(status.isIdle());
     processElementInternal();
   }
 
@@ -284,6 +294,9 @@ public class GlutenOneInputOperator<IN, OUT> extends TableStreamOperator<OUT>
           }
         },
         () -> {
+          GlutenTaskSessionContext.unregisterSessionResource(id);
+        },
+        () -> {
           if (sessionResource != null) {
             sessionResource.close();
           }
@@ -313,32 +326,39 @@ public class GlutenOneInputOperator<IN, OUT> extends TableStreamOperator<OUT>
 
   @Override
   public void prepareSnapshotPreBarrier(long checkpointId) throws Exception {
-    // TODO: notify velox
     super.prepareSnapshotPreBarrier(checkpointId);
   }
 
   @Override
   public void snapshotState(StateSnapshotContext context) throws Exception {
-    // TODO: implement it
-    task.snapshotState(0);
+    snapshotNativeState(context);
     super.snapshotState(context);
+  }
+
+  protected void snapshotNativeState(StateSnapshotContext context) throws Exception {
+    task.snapshotState(context.getCheckpointId());
   }
 
   @Override
   public void initializeState(StateInitializationContext context) throws Exception {
+    initializeNativeState(context);
+    super.initializeState(context);
+  }
+
+  protected void initializeNativeState(StateInitializationContext context) throws Exception {
     if (task == null) {
       initSession();
     }
     if (!(getKeyedStateBackend() instanceof RocksDBKeyedStateBackend)) {
       task.initializeState(0, null);
     }
-    super.initializeState(context);
   }
 
   @Override
   public void notifyCheckpointComplete(long checkpointId) throws Exception {
-    // TODO: notify velox
-    task.notifyCheckpointComplete(checkpointId);
+    if (!(this instanceof GlutenStreamingFileWriterOperator)) {
+      task.notifyCheckpointComplete(checkpointId);
+    }
     super.notifyCheckpointComplete(checkpointId);
   }
 
