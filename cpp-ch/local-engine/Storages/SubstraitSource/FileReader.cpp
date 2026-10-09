@@ -25,6 +25,9 @@
 #include <Storages/SubstraitSource/Delta/DeltaMeta.h>
 #include <Storages/SubstraitSource/Delta/DeltaReader.h>
 #include <Storages/SubstraitSource/Iceberg/IcebergReader.h>
+#if GLUTEN_ENABLE_NATIVE_PAIMON
+#include <Storages/SubstraitSource/Paimon/PaimonReader.h>
+#endif
 #include <Storages/SubstraitSource/ParquetFormatFile.h>
 #include <boost/algorithm/string/case_conv.hpp>
 #include <Common/CHUtil.h>
@@ -280,6 +283,17 @@ std::unique_ptr<NormalFileReader> createNormalFileReader(
     file->initialize(column_index_filter);
     auto createInputFormat = [&](const DB::Block & new_read_header_) -> FormatFile::InputFormatPtr
     { return file->createInputFormat(new_read_header_, filter_actions_dag); };
+
+    if (file->getFileInfo().has_paimon())
+    {
+#if GLUTEN_ENABLE_NATIVE_PAIMON
+        return paimon::PaimonReader::create(file, to_read_header_, output_header_);
+#else
+        throw DB::Exception(
+            DB::ErrorCodes::NOT_IMPLEMENTED,
+            "Paimon native read is disabled in this libch build (GLUTEN_ENABLE_NATIVE_PAIMON=OFF)");
+#endif
+    }
 
     if (file->getFileInfo().has_iceberg())
         return iceberg::IcebergReader::create(file, to_read_header_, output_header_, createInputFormat);

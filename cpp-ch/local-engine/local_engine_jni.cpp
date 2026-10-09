@@ -48,6 +48,9 @@
 #include <Storages/Output/BlockStripeSplitter.h>
 #include <Storages/Output/NormalFileWriter.h>
 #include <Storages/SubstraitSource/Delta/DeltaWriter.h>
+#if GLUTEN_ENABLE_NATIVE_PAIMON
+#include <Storages/SubstraitSource/Paimon/PaimonWriter.h>
+#endif
 #include <jni/SharedPointerWrapper.h>
 #include <jni/jni_common.h>
 #include <jni/jni_error.h>
@@ -948,6 +951,75 @@ JNIEXPORT void Java_org_apache_gluten_vectorized_CHBlockWriterJniWrapper_nativeC
     delete writer;
     LOCAL_ENGINE_JNI_METHOD_END(env, )
 }
+
+#if GLUTEN_ENABLE_NATIVE_PAIMON
+JNIEXPORT jlong Java_org_apache_gluten_vectorized_PaimonWriterJniWrapper_nativeCreate(
+    JNIEnv * env, jobject, jstring table_path, jstring commit_user)
+{
+    LOCAL_ENGINE_JNI_METHOD_START
+    auto * writer = new local_engine::PaimonWriter(jstring2string(env, table_path), jstring2string(env, commit_user));
+    return reinterpret_cast<jlong>(writer);
+    LOCAL_ENGINE_JNI_METHOD_END(env, 0)
+}
+
+JNIEXPORT void Java_org_apache_gluten_vectorized_PaimonWriterJniWrapper_nativeWrite(JNIEnv * env, jobject, jlong instance, jlong block_address)
+{
+    LOCAL_ENGINE_JNI_METHOD_START
+    auto * writer = reinterpret_cast<local_engine::PaimonWriter *>(instance);
+    writer->write(*reinterpret_cast<DB::Block *>(block_address));
+    LOCAL_ENGINE_JNI_METHOD_END(env, )
+}
+
+JNIEXPORT jobjectArray Java_org_apache_gluten_vectorized_PaimonWriterJniWrapper_nativePrepareCommit(JNIEnv * env, jobject, jlong instance)
+{
+    LOCAL_ENGINE_JNI_METHOD_START
+    auto * writer = reinterpret_cast<local_engine::PaimonWriter *>(instance);
+    auto messages = writer->prepareCommit();
+    auto byte_array_class = env->FindClass("[B");
+    auto result = env->NewObjectArray(static_cast<jsize>(messages.size()), byte_array_class, nullptr);
+    for (size_t i = 0; i < messages.size(); ++i)
+    {
+        auto bytes = env->NewByteArray(static_cast<jsize>(messages[i].size()));
+        env->SetByteArrayRegion(bytes, 0, static_cast<jsize>(messages[i].size()), reinterpret_cast<const jbyte *>(messages[i].data()));
+        env->SetObjectArrayElement(result, static_cast<jsize>(i), bytes);
+        env->DeleteLocalRef(bytes);
+    }
+    return result;
+    LOCAL_ENGINE_JNI_METHOD_END(env, nullptr)
+}
+
+JNIEXPORT void Java_org_apache_gluten_vectorized_PaimonWriterJniWrapper_nativeClose(JNIEnv * env, jobject, jlong instance)
+{
+    LOCAL_ENGINE_JNI_METHOD_START
+    auto * writer = reinterpret_cast<local_engine::PaimonWriter *>(instance);
+    SCOPE_EXIT({ delete writer; });
+    writer->close();
+    LOCAL_ENGINE_JNI_METHOD_END(env, )
+}
+#else
+JNIEXPORT jlong Java_org_apache_gluten_vectorized_PaimonWriterJniWrapper_nativeCreate(
+    JNIEnv * env, jobject, jstring, jstring)
+{
+    LOCAL_ENGINE_JNI_METHOD_START
+    throw DB::Exception(
+        DB::ErrorCodes::NOT_IMPLEMENTED,
+        "Paimon native write is disabled in this libch build (GLUTEN_ENABLE_NATIVE_PAIMON=OFF)");
+    LOCAL_ENGINE_JNI_METHOD_END(env, 0)
+}
+
+JNIEXPORT void Java_org_apache_gluten_vectorized_PaimonWriterJniWrapper_nativeWrite(JNIEnv *, jobject, jlong, jlong)
+{
+}
+
+JNIEXPORT jobjectArray Java_org_apache_gluten_vectorized_PaimonWriterJniWrapper_nativePrepareCommit(JNIEnv *, jobject, jlong)
+{
+    return nullptr;
+}
+
+JNIEXPORT void Java_org_apache_gluten_vectorized_PaimonWriterJniWrapper_nativeClose(JNIEnv *, jobject, jlong)
+{
+}
+#endif
 
 JNIEXPORT jlong Java_org_apache_spark_sql_execution_datasources_CHDatasourceJniWrapper_createFilerWriter(
     JNIEnv * env, jobject, jstring file_uri_, jbyteArray writeRel)
