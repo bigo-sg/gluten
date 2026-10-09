@@ -1,0 +1,50 @@
+cpp-ch/local-engine/Parser/LocalExecutor.cpp
+  s_116df87c9cdd62::t_e2bcd894328548 57,60
+  s_116df87c9cdd62::t_c0d888f43ba05c 58-59,61,64,132-136,138-139,158-159,161,165,171,181
+  s_116df87c9cdd62::t_90a6b5582d007e 54,71-77,83,131,137,140,155-157,160,162-164,166-170,172-180
+  s_116df87c9cdd62::t_268466b180e838 92,204
+backends-clickhouse/src-celeborn/main/scala/org/apache/spark/shuffle/CHCelebornColumnarShuffleWriter.scala
+  s_116df87c9cdd62::t_c0d888f43ba05c 63-65,73-75,77-79,106,114-116
+  s_116df87c9cdd62::t_8c421608e079df 120,122,128,158,160,164,166,189
+  s_116df87c9cdd62::t_8794a3195e6f49 35,58-62,66-72,76,80-105,107-108,112-113,117-118,196
+cpp-ch/local-engine/local_engine_jni.cpp
+  s_116df87c9cdd62::t_ce7eb4f4e43e8a 317-322,325,327,329-342,345-347
+  s_116df87c9cdd62::t_c0d888f43ba05c 323-324,326,328,343-344
+  s_116df87c9cdd62::t_8c421608e079df 653,668,670,673,690,816
+cpp-ch/local-engine/Shuffle/SparkExchangeSink.cpp
+  s_116df87c9cdd62::t_8c421608e079df 106
+cpp-ch/local-engine/Shuffle/SparkExchangeSink.h
+  s_116df87c9cdd62::t_8c421608e079df 89
+gluten-celeborn/src/main/scala/org/apache/spark/shuffle/CelebornColumnarShuffleWriter.scala
+  s_116df87c9cdd62::t_86c0cb54afb6c3 155-157,159-161,168-170
+backends-clickhouse/src/main/java/org/apache/gluten/vectorized/CHShuffleSplitterJniWrapper.java
+  s_116df87c9cdd62::t_8794a3195e6f49 129-131,133-139
+  s_116df87c9cdd62::t_ce7eb4f4e43e8a 128,132
+cpp-ch/local-engine/Common/QueryContext.cpp
+  s_116df87c9cdd62::t_ce7eb4f4e43e8a 91-94,97,99,101-104
+  s_116df87c9cdd62::t_c0d888f43ba05c 95-96,98,100
+cpp-ch/local-engine/Parser/LocalExecutor.h
+  s_116df87c9cdd62::t_73affdc266eda6 75
+  s_116df87c9cdd62::t_90a6b5582d007e 26-27,73-74
+cpp-ch/local-engine/Common/QueryContext.h
+  s_116df87c9cdd62::t_ce7eb4f4e43e8a 66-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "0db402db3f834027b67577b50e7e3be12b6d0a6b",
+  "prompts": {},
+  "logical_commit_id": "0db402db3f834027b67577b50e7e3be12b6d0a6b",
+  "sessions": {
+    "s_116df87c9cdd62": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f77431ad7ffeyLT4Il1ci1HWxa",
+        "model": "glm-5.2"
+      },
+      "human_author": "lgbo-ustc <lgbo.ustc@gmail.com>",
+      "total_additions": 205,
+      "total_deletions": 224
+    }
+  }
+}

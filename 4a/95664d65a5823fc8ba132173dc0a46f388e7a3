@@ -1,0 +1,30 @@
+gluten-substrait/src/main/scala/org/apache/gluten/backendsapi/SparkPlanExecApi.scala
+  s_319a2ba20229d1::t_2505dc40382624 356-363
+backends-clickhouse/src/main/scala/org/apache/gluten/backendsapi/clickhouse/CHSparkPlanExecApi.scala
+  s_319a2ba20229d1::t_1e712059e1d5a9 59,406-420
+  s_319a2ba20229d1::t_a31b3d14633d10 421
+gluten-substrait/src/main/scala/org/apache/gluten/expression/ExpressionConverter.scala
+  s_319a2ba20229d1::t_976603efe3b299 295-296
+cpp-ch/local-engine/Functions/SparkFunctionMapFromEntries.cpp
+  s_319a2ba20229d1::t_dfaf51a7b6dde1 26,32,35,75-86,101-104,130-176,178,222,227,229,233-322,324-334,336-338,340,342-351,357,359-367,370-378,381-397
+  s_319a2ba20229d1::t_04a09737bf45f4 177,323,335
+backends-clickhouse/src/test/scala/org/apache/gluten/execution/GlutenFunctionValidateSuite.scala
+  s_319a2ba20229d1::t_70c0fb92c31967 1113-1115,1118-1120,1126-1128,1131-1136,1140-1146,1159-1161
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "4a95664d65a5823fc8ba132173dc0a46f388e7a3",
+  "prompts": {},
+  "logical_commit_id": "4a95664d65a5823fc8ba132173dc0a46f388e7a3",
+  "sessions": {
+    "s_319a2ba20229d1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eed3a-a169-7e13-89cc-12ed60dc3231",
+        "model": "gpt-5.5"
+      },
+      "human_author": "xumingyong <xumingyong@bigo.sg>"
+    }
+  }
+}

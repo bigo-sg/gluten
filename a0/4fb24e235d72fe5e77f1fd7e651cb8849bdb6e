@@ -1,0 +1,24 @@
+cpp-ch/local-engine/Parser/RelParsers/ExpandRelParser.cpp
+  s_31013c3a90928d::t_133585b7327a28 122
+backends-clickhouse/src/test/scala/org/apache/gluten/execution/tpch/GlutenClickHouseTPCHSaltNullParquetSuite.scala
+  s_31013c3a90928d::t_133585b7327a28 894,924,941,946
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "a04fb24e235d72fe5e77f1fd7e651cb8849bdb6e",
+  "prompts": {},
+  "logical_commit_id": "a04fb24e235d72fe5e77f1fd7e651cb8849bdb6e",
+  "sessions": {
+    "s_31013c3a90928d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a017d4-efcc-7303-9090-9637147b202a",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "exmy <xumovens@gmail.com>",
+      "total_additions": 5,
+      "total_deletions": 5
+    }
+  }
+}

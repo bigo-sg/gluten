@@ -1,0 +1,27 @@
+cpp-ch/local-engine/Parser/ExpressionParser.h
+  s_9e5c0844d2ab5e::t_5f917ca28a2d5d 88-89
+gluten-ut/spark33/src/test/scala/org/apache/spark/sql/GlutenGeneratorFunctionSuite.scala
+  s_9e5c0844d2ab5e::t_a79cbb7b7af294 19-48
+cpp-ch/local-engine/Parser/ExpressionParser.cpp
+  s_9e5c0844d2ab5e::t_5f917ca28a2d5d 554-559,827-876,878-907,909
+  s_9e5c0844d2ab5e::t_08d9e59775a24b 877
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "741a822e7f6583b209bb02a24e287b35aa86de16",
+  "prompts": {},
+  "logical_commit_id": "741a822e7f6583b209bb02a24e287b35aa86de16",
+  "sessions": {
+    "s_9e5c0844d2ab5e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fcc1a-7819-7260-b956-1d5f99529dd2",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "exmy <xumovens@gmail.com>",
+      "total_additions": 701,
+      "total_deletions": 28
+    }
+  }
+}

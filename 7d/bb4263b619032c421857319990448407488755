@@ -1,0 +1,29 @@
+cpp-ch/local-engine/Shuffle/PartitionWriter.h
+  s_0396e0e9df3a6a::t_a9d4fa505f7d65 312
+cpp-ch/local-engine/Shuffle/PartitionWriter.cpp
+  s_0396e0e9df3a6a::t_31842ffa732ffe 527,544
+  s_0396e0e9df3a6a::t_ea605530bef244 521
+  s_0396e0e9df3a6a::t_02a131be040b9a 510-517,519-520,523-526,528,530-541,543,545-549,553-567,569-570
+  s_0396e0e9df3a6a::t_c6cb638b22857d 518
+  s_0396e0e9df3a6a::t_e81d6a8aec1396 550-552
+  s_0396e0e9df3a6a::t_4cc3b8e0bbfd72 522
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "7dbb4263b619032c421857319990448407488755",
+  "prompts": {},
+  "logical_commit_id": "7dbb4263b619032c421857319990448407488755",
+  "sessions": {
+    "s_0396e0e9df3a6a": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f3e9995c4ffehPJKRoOxLai9F3",
+        "model": "glm-5.2"
+      },
+      "human_author": "lgbo-ustc <lgbo.ustc@gmail.com>",
+      "total_additions": 72,
+      "total_deletions": 50
+    }
+  }
+}

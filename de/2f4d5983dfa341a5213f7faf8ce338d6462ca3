@@ -1,0 +1,32 @@
+gluten-ut/spark40/src/test/scala/org/apache/spark/sql/GlutenGeneratorFunctionSuite.scala
+  s_9e5c0844d2ab5e::t_ece10acfb3194a 33-41
+gluten-ut/spark34/src/test/scala/org/apache/spark/sql/GlutenGeneratorFunctionSuite.scala
+  s_9e5c0844d2ab5e::t_ece10acfb3194a 30-38
+gluten-ut/spark35/src/test/scala/org/apache/spark/sql/GlutenGeneratorFunctionSuite.scala
+  s_9e5c0844d2ab5e::t_ece10acfb3194a 33-41
+cpp-ch/local-engine/Parser/ExpressionParser.cpp
+  s_9e5c0844d2ab5e::t_ece10acfb3194a 833-835
+gluten-ut/spark33/src/test/scala/org/apache/spark/sql/GlutenGeneratorFunctionSuite.scala
+  s_9e5c0844d2ab5e::t_ece10acfb3194a 30-38
+gluten-ut/spark41/src/test/scala/org/apache/spark/sql/GlutenGeneratorFunctionSuite.scala
+  s_9e5c0844d2ab5e::t_ece10acfb3194a 33-41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "de2f4d5983dfa341a5213f7faf8ce338d6462ca3",
+  "prompts": {},
+  "logical_commit_id": "de2f4d5983dfa341a5213f7faf8ce338d6462ca3",
+  "sessions": {
+    "s_9e5c0844d2ab5e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fcc1a-7819-7260-b956-1d5f99529dd2",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "exmy <xumovens@gmail.com>",
+      "total_additions": 531,
+      "total_deletions": 21
+    }
+  }
+}

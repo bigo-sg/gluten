@@ -1,0 +1,25 @@
+backends-clickhouse/src-delta33/main/scala/org/apache/spark/sql/delta/Snapshot.scala
+  s_e6c06c77c658ea::t_2e255a798d5730 128-129
+  s_e6c06c77c658ea::t_a4e6a764cfb668 574,578-580,584,586,589,592
+  s_e6c06c77c658ea::t_ab2097d777946f 160
+  s_e6c06c77c658ea::t_fd070bbe65cf19 161
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "1efc8b659c5fd7524cc8f71f245960c11a8815b0",
+  "prompts": {},
+  "logical_commit_id": "1efc8b659c5fd7524cc8f71f245960c11a8815b0",
+  "sessions": {
+    "s_e6c06c77c658ea": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f43b27323ffeNxUQYuDzQWmVBe",
+        "model": "glm-5.2"
+      },
+      "human_author": "lgbo-ustc <lgbo.ustc@gmail.com>",
+      "total_additions": 20,
+      "total_deletions": 18
+    }
+  }
+}

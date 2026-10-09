@@ -1,0 +1,71 @@
+backends-clickhouse/src/main/scala/org/apache/spark/shuffle/CHColumnarShuffleWriter.scala
+  s_c898c8c9cf593e::t_48d1ead55d2525 60
+  s_c898c8c9cf593e::t_a812536db34877 113-114
+cpp-ch/local-engine/Shuffle/ShuffleCommon.h
+  s_0396e0e9df3a6a::t_192da862c76ed2 51-52
+backends-clickhouse/src-celeborn/main/scala/org/apache/spark/shuffle/CHCelebornColumnarShuffleWriter.scala
+  s_c898c8c9cf593e::t_857cc237ea202e 83-84
+backends-clickhouse/src/test/scala/org/apache/gluten/execution/GlutenClickHouseColumnarMemorySortShuffleSuite.scala
+  s_c898c8c9cf593e::t_d752964a5b9327 36
+backends-clickhouse/src-celeborn/test/scala/org/apache/gluten/execution/GlutenClickHouseRSSColumnarMemorySortShuffleSuite.scala
+  s_c898c8c9cf593e::t_62b0562f42db8c 37
+cpp-ch/local-engine/local_engine_jni.cpp
+  s_0396e0e9df3a6a::t_71417364f5b3c5 731-732
+  s_0396e0e9df3a6a::t_e09c1da51b5a18 787-788
+  s_0396e0e9df3a6a::t_e8a34d30d61f12 691-692
+  s_0396e0e9df3a6a::t_7876ff039df742 755-756
+cpp-ch/local-engine/Shuffle/SparkExchangeSink.cpp
+  s_0396e0e9df3a6a::t_3e9f04f9366d72 81
+  s_0396e0e9df3a6a::t_3e651ec550bc04 128-134
+  s_0396e0e9df3a6a::t_aefe97e5342b23 144-145
+  s_0396e0e9df3a6a::t_2b46cea0c1b3e7 166-171
+cpp-ch/local-engine/Shuffle/PartitionWriter.h
+  s_0396e0e9df3a6a::t_9b1f9874bd40b6 219-222,232,235-316
+  s_0396e0e9df3a6a::t_d777bcb208f921 25,27-28
+  s_0396e0e9df3a6a::t_e240d25f3dc01e 95-100
+cpp-ch/local-engine/Shuffle/PartitionWriter.cpp
+  s_0396e0e9df3a6a::t_9ed0ac1ecbf77f 389-390
+  s_0396e0e9df3a6a::t_dfc026dab740c2 450,452-637,639
+  s_0396e0e9df3a6a::t_5059f482863117 451
+backends-clickhouse/src/main/java/org/apache/gluten/vectorized/CHShuffleSplitterJniWrapper.java
+  s_c898c8c9cf593e::t_671debf578acc2 40-41,59-60
+  s_c898c8c9cf593e::t_9fcc33de5f333e 74-75,90-91
+  s_c898c8c9cf593e::t_da487add9074e6 128-129
+  s_c898c8c9cf593e::t_025665f111ab6d 111-112
+backends-clickhouse/src/main/scala/org/apache/gluten/backendsapi/clickhouse/CHConfig.scala
+  s_c898c8c9cf593e::t_2ae92339cc2aea 161
+  s_c898c8c9cf593e::t_c814c6fb070a96 163
+  s_c898c8c9cf593e::t_f7f4d187f6c4dd 82-83,85-93
+  s_c898c8c9cf593e::t_cb355e5d5aab78 95-102
+  s_c898c8c9cf593e::t_511c7c1b17dcd3 94
+  s_c898c8c9cf593e::t_1ccc4e1c4f1fec 160
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "18efbd4ce3a069044eebb244760850b0e6f9f01c",
+  "prompts": {},
+  "logical_commit_id": "18efbd4ce3a069044eebb244760850b0e6f9f01c",
+  "sessions": {
+    "s_0396e0e9df3a6a": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f3e9995c4ffehPJKRoOxLai9F3",
+        "model": "glm-5.2"
+      },
+      "human_author": null,
+      "total_additions": 409,
+      "total_deletions": 141
+    },
+    "s_c898c8c9cf593e": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f4c47315effeyW92TYntzb2chA",
+        "model": "glm-5.2"
+      },
+      "human_author": null,
+      "total_additions": 539,
+      "total_deletions": 216
+    }
+  }
+}

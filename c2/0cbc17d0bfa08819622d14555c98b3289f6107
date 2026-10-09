@@ -1,0 +1,67 @@
+cpp-ch/local-engine/Operator/TaskCancelCheckTransform.h
+  s_336ef1c9a817b3::t_b50982c72cc4f5 33,40
+  s_336ef1c9a817b3::t_5a29bdc4072046 39
+  s_336ef1c9a817b3::t_6431ce99b78f34 1-32,34-38,41-42
+cpp-ch/local-engine/jni/CelebornClient.h
+  s_336ef1c9a817b3::t_320b14053f8bb8 20
+backends-clickhouse/src-celeborn/main/scala/org/apache/spark/shuffle/CHCelebornColumnarShuffleWriter.scala
+  s_336ef1c9a817b3::t_4479d7f1df9110 68,71,75,80-83
+  s_336ef1c9a817b3::t_f6ff2698a9f7c2 73,76-79
+  s_336ef1c9a817b3::t_e7f98ba015af70 65-67,69,72,74,84,86-106,108,111-112,114-136,141-144
+  s_336ef1c9a817b3::t_41dff61d498950 107,113
+  s_336ef1c9a817b3::t_c4118619889215 137,139-140
+  s_336ef1c9a817b3::t_111bc575f27e11 36-39
+  s_336ef1c9a817b3::t_0293a16b530c41 138
+cpp-ch/local-engine/Operator/TaskCancelCheckTransform.cpp
+  s_336ef1c9a817b3::t_130ced34795a3e 20
+  s_336ef1c9a817b3::t_04cf770516747c 34,37,43
+  s_336ef1c9a817b3::t_d494dc207e877b 36
+  s_336ef1c9a817b3::t_1651699e757548 27,46,53-54
+  s_336ef1c9a817b3::t_cfa1f315a67083 1-19,21,23-26,28-31,47-49,55-57
+  s_336ef1c9a817b3::t_02cea097f31cd9 32-33,35,38-42,44-45,52
+  s_336ef1c9a817b3::t_44b93241b24b2a 22
+  s_336ef1c9a817b3::t_9711d31a61bf3d 50-51
+backends-clickhouse/src/main/java/org/apache/gluten/vectorized/CHShuffleSplitterJniWrapper.java
+  s_336ef1c9a817b3::t_43609fa4e5d811 125
+  s_336ef1c9a817b3::t_2092f600504029 72,88
+cpp-ch/local-engine/local_engine_jni.cpp
+  s_336ef1c9a817b3::t_d324bbd4ba56fe 618-623
+  s_336ef1c9a817b3::t_e6a71ebf6ba64d 754
+  s_336ef1c9a817b3::t_d350b5747c2a91 661
+  s_336ef1c9a817b3::t_45d1562d2a7940 638,640-641,644-648,650
+  s_336ef1c9a817b3::t_84a0342025d286 788
+cpp-ch/local-engine/jni/TaskContextCancelChecker.h
+  s_336ef1c9a817b3::t_cc72274fb990ef 21
+  s_336ef1c9a817b3::t_76b9e5aa7bf204 1-20,22-56
+cpp-ch/local-engine/Shuffle/SparkExchangeSink.cpp
+  s_336ef1c9a817b3::t_e7e56964e15a53 178-181,183-187
+  s_336ef1c9a817b3::t_9d8efbb90cdce3 21
+  s_336ef1c9a817b3::t_9c10dc229b7751 182
+  s_336ef1c9a817b3::t_72ea3d0e524a07 106-109,111-112,114-120,124-127,132
+  s_336ef1c9a817b3::t_001fa2f41935a8 113
+  s_336ef1c9a817b3::t_5e4b370a1b98d0 200-202,204
+  s_336ef1c9a817b3::t_692d1eb7e3b351 198-199
+cpp-ch/local-engine/Shuffle/SparkExchangeSink.h
+  s_336ef1c9a817b3::t_cc8e09d3a3edc5 90,95
+  s_336ef1c9a817b3::t_f451856c646c7a 116
+  s_336ef1c9a817b3::t_a08dc1dbfe6c1a 24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "c20cbc17d0bfa08819622d14555c98b3289f6107",
+  "prompts": {},
+  "logical_commit_id": "c20cbc17d0bfa08819622d14555c98b3289f6107",
+  "sessions": {
+    "s_336ef1c9a817b3": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_fa54a84ecffeux27L5kGi1m4Fo",
+        "model": "glm-5.2"
+      },
+      "human_author": "lgbo-ustc <lgbo.ustc@gmail.com>",
+      "total_additions": 367,
+      "total_deletions": 132
+    }
+  }
+}

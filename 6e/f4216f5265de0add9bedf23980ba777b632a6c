@@ -1,0 +1,36 @@
+backends-clickhouse/src/test/scala/org/apache/gluten/execution/tpch/GlutenClickHouseTPCHSaltNullParquetSuite.scala
+  s_939921528487d4::t_e1041ce1d59e91 897,927,944,949
+  s_31013c3a90928d::t_133585b7327a28 897,927,944,949
+cpp-ch/local-engine/Parser/RelParsers/ExpandRelParser.cpp
+  s_939921528487d4::t_e1041ce1d59e91 122
+  s_31013c3a90928d::t_133585b7327a28 122
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "6ef4216f5265de0add9bedf23980ba777b632a6c",
+  "prompts": {},
+  "logical_commit_id": "6ef4216f5265de0add9bedf23980ba777b632a6c",
+  "sessions": {
+    "s_31013c3a90928d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a017d4-efcc-7303-9090-9637147b202a",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "exmy <xumovens@gmail.com>",
+      "total_additions": 5,
+      "total_deletions": 5
+    },
+    "s_939921528487d4": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a01296-cef9-79b0-a54f-ee5439be8924",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "exmy <xumovens@gmail.com>",
+      "total_additions": 631,
+      "total_deletions": 254
+    }
+  }
+}

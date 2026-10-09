@@ -1,0 +1,39 @@
+cpp-ch/local-engine/Join/StorageJoinFromReadBuffer.cpp
+  s_acb5f95f40f438::t_5db729ab673b1a 20
+  s_fe3c343c9d4972::t_e485c3d4bc5e26 154-155,157-159
+  s_fe3c343c9d4972::t_fd0efd9eef605b 82,85-93
+  s_fe3c343c9d4972::t_581a184ed2bbd0 103-107
+  s_fe3c343c9d4972::t_803631d57c68c0 156
+  s_fe3c343c9d4972::t_47cace7b3b5123 94-97
+  s_fe3c343c9d4972::t_794f174dcb2fef 98-102
+  s_fe3c343c9d4972::t_e71d0d5e234e50 84
+  s_fe3c343c9d4972::t_0a8dd4935d4cd6 125
+  s_fe3c343c9d4972::t_f16164f7afe2ee 160-163
+backends-clickhouse/src/test/scala/org/apache/gluten/execution/GlutenFunctionValidateSuite.scala
+  s_acb5f95f40f438::t_cc5c68a1c6fad0 585,780
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "d37e92160b3d20c680bc301252253c6bf9f08518",
+  "prompts": {},
+  "logical_commit_id": "1de30b517b42dd3f4fb6620b4e318c460db52203",
+  "sessions": {
+    "s_acb5f95f40f438": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_127aaae7cffe27TZ1oWSPWhYj4",
+        "model": "gpt-5.5"
+      },
+      "human_author": "lgbo-ustc <lgbo.ustc@gmail.com>"
+    },
+    "s_fe3c343c9d4972": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_127c5517fffeJQ0M6QuKK7KPEP",
+        "model": "gpt-5.5"
+      },
+      "human_author": "lgbo-ustc <lgbo.ustc@gmail.com>"
+    }
+  }
+}

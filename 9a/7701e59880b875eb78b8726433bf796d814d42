@@ -1,0 +1,17 @@
+backends-clickhouse/src/main/scala/org/apache/gluten/extension/ConvertWindowToAggregate.scala
+  h_1786ccf2ff1b01 57,62-64,115-124
+backends-clickhouse/src/test/scala/org/apache/gluten/execution/tpch/GlutenClickHouseTPCHSaltNullParquetSuite.scala
+  h_1786ccf2ff1b01 556-594
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "9a7701e59880b875eb78b8726433bf796d814d42",
+  "prompts": {},
+  "logical_commit_id": "9a7701e59880b875eb78b8726433bf796d814d42",
+  "humans": {
+    "h_1786ccf2ff1b01": {
+      "author": "lgbo-ustc <lgbo.ustc@gmail.com>"
+    }
+  }
+}

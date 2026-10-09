@@ -1,0 +1,42 @@
+cpp-ch/local-engine/Functions/SparkFunctionMapFromEntries.cpp
+  s_319a2ba20229d1::t_b6e0d3b1968ff3 1-18,20-22,24-30,34-43,45-47,49-80,82-124,135-187,190-194,197,206,208-209,218-235,238-240
+  s_319a2ba20229d1::t_fc3dd107490476 32,188,198,203,211,216-217
+  s_319a2ba20229d1::t_48554dba13120a 33,44,48,189,195-196,199-202,204-205,207,210,212-215,236-237
+  s_319a2ba20229d1::t_81fc0240c51564 31,126-128
+  s_319a2ba20229d1::t_676663177dcce5 23
+  s_319a2ba20229d1::t_e76720a7778e5a 19,81,125,129-134
+shims/common/src/main/scala/org/apache/gluten/expression/ExpressionNames.scala
+  s_319a2ba20229d1::t_67dd708c1caec9 302
+  s_319a2ba20229d1::t_b5f6c6cffaa90d 301
+gluten-substrait/src/main/scala/org/apache/gluten/expression/ExpressionConverter.scala
+  s_319a2ba20229d1::t_1242d3156b747a 294-296,302-303
+  s_319a2ba20229d1::t_bdaa441ee80bc9 297-301
+backends-clickhouse/src/test/scala/org/apache/gluten/execution/GlutenFunctionValidateSuite.scala
+  s_319a2ba20229d1::t_9c9415c8bf2627 1108
+  s_319a2ba20229d1::t_5f9a9383d0da76 1110
+  s_319a2ba20229d1::t_88ee2b9b694a03 1121
+  s_319a2ba20229d1::t_ee3572e14b1d1e 23,1101-1107,1109,1111-1120,1122-1145,1147-1149
+  s_319a2ba20229d1::t_4bf7696f17aaaf 1146,1150
+gluten-substrait/src/main/scala/org/apache/gluten/expression/ExpressionMappings.scala
+  s_319a2ba20229d1::t_30e2cbe3d642b9 268
+cpp-ch/local-engine/Parser/scalar_function_parser/CommonScalarFunctionParser.cpp
+  s_319a2ba20229d1::t_c6fe11244de716 175
+  s_319a2ba20229d1::t_5c738e23fdb713 176
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "f8dfa36829caa622dc674003f0353552ee04672d",
+  "prompts": {},
+  "logical_commit_id": "f8dfa36829caa622dc674003f0353552ee04672d",
+  "sessions": {
+    "s_319a2ba20229d1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eed3a-a169-7e13-89cc-12ed60dc3231",
+        "model": "gpt-5.5"
+      },
+      "human_author": "xumingyong <xumingyong@bigo.sg>"
+    }
+  }
+}

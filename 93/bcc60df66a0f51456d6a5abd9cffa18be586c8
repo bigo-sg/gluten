@@ -1,0 +1,22 @@
+backends-clickhouse/src-celeborn/main/scala/org/apache/spark/shuffle/CHCelebornColumnarShuffleWriter.scala
+  s_d79d4602630525::t_5cb26f7c33fb65 202-206
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "93bcc60df66a0f51456d6a5abd9cffa18be586c8",
+  "prompts": {},
+  "logical_commit_id": "93bcc60df66a0f51456d6a5abd9cffa18be586c8",
+  "sessions": {
+    "s_d79d4602630525": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f61377586ffeFTtbppJViu61vr",
+        "model": "glm-5.2"
+      },
+      "human_author": "lgbo-ustc <lgbo.ustc@gmail.com>",
+      "total_additions": 5,
+      "total_deletions": 1
+    }
+  }
+}

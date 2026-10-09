@@ -1,0 +1,49 @@
+cpp-ch/local-engine/Parser/RelParsers/ExpandRelParser.cpp
+  s_31013c3a90928d::t_9668ead2c65de3 23,117-122
+  s_939921528487d4::t_60fdc540d63054 23,117-122
+cpp-ch/local-engine/Operator/ExpandTransform.cpp
+  s_31013c3a90928d::t_9668ead2c65de3 117
+  s_939921528487d4::t_07b5f03227b612 117
+backends-clickhouse/src/test/scala/org/apache/gluten/execution/tpch/GlutenClickHouseTPCHSaltNullParquetSuite.scala
+  s_31013c3a90928d::t_9668ead2c65de3 24,879-952
+  s_939921528487d4::t_080a2831e9ede3 911-923,925-927,952,954
+  s_939921528487d4::t_60fdc540d63054 881-893,909-910
+  s_939921528487d4::t_8e7885ecec188b 928-935
+  s_939921528487d4::t_07b5f03227b612 24,879,894-907,924,938-940,942-951
+  s_939921528487d4::t_1c450ba83a8d53 936-937
+  s_939921528487d4::t_7b6477729d2bfe 941
+  s_939921528487d4::t_685be64e220769 908
+  s_939921528487d4::t_0375e34ee7fd79 880
+cpp-ch/local-engine/Operator/AdvancedExpandStep.cpp
+  s_31013c3a90928d::t_9668ead2c65de3 251
+  s_939921528487d4::t_07b5f03227b612 251
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "32a7d71b140e9b264bfb26bb33160df4e2283440",
+  "prompts": {},
+  "logical_commit_id": "32a7d71b140e9b264bfb26bb33160df4e2283440",
+  "sessions": {
+    "s_31013c3a90928d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a017d4-efcc-7303-9090-9637147b202a",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "exmy <xumovens@gmail.com>",
+      "total_additions": 84,
+      "total_deletions": 3
+    },
+    "s_939921528487d4": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a01296-cef9-79b0-a54f-ee5439be8924",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "exmy <xumovens@gmail.com>",
+      "total_additions": 626,
+      "total_deletions": 249
+    }
+  }
+}

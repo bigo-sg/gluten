@@ -1,0 +1,49 @@
+backends-clickhouse/src/test/scala/org/apache/gluten/execution/GlutenFunctionValidateSuite.scala
+  s_acb5f95f40f438::t_cc5c68a1c6fad0 585,780
+cpp-ch/local-engine/Join/StorageJoinFromReadBuffer.cpp
+  s_acb5f95f40f438::t_5db729ab673b1a 20
+  s_91ade1a78e42d8::t_9ce850a46d3e79 29-30,43,67-91,95-97,175,225
+  s_fe3c343c9d4972::t_e485c3d4bc5e26 116,186-187,189-191
+  s_fe3c343c9d4972::t_581a184ed2bbd0 136-140
+  s_fe3c343c9d4972::t_f16164f7afe2ee 192-195
+  s_91ade1a78e42d8::t_5c7b7ac7b97943 92,94,172,217-219
+  s_fe3c343c9d4972::t_794f174dcb2fef 131-135
+  s_fe3c343c9d4972::t_e71d0d5e234e50 117
+  s_fe3c343c9d4972::t_803631d57c68c0 188
+  s_fe3c343c9d4972::t_fd0efd9eef605b 115,118-126
+  s_fe3c343c9d4972::t_0a8dd4935d4cd6 158
+  s_fe3c343c9d4972::t_47cace7b3b5123 127-130
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.13",
+  "base_commit_sha": "591360b3aebfed777a48a15766e03f778045f02b",
+  "prompts": {},
+  "logical_commit_id": "1de30b517b42dd3f4fb6620b4e318c460db52203",
+  "sessions": {
+    "s_91ade1a78e42d8": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_12725d178ffedIjZFABiMENiKA",
+        "model": "gpt-5.5"
+      },
+      "human_author": null
+    },
+    "s_acb5f95f40f438": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_127aaae7cffe27TZ1oWSPWhYj4",
+        "model": "gpt-5.5"
+      },
+      "human_author": "lgbo-ustc <lgbo.ustc@gmail.com>"
+    },
+    "s_fe3c343c9d4972": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_127c5517fffeJQ0M6QuKK7KPEP",
+        "model": "gpt-5.5"
+      },
+      "human_author": "lgbo-ustc <lgbo.ustc@gmail.com>"
+    }
+  }
+}

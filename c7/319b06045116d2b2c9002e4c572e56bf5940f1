@@ -1,0 +1,29 @@
+cpp-ch/local-engine/Operator/TaskCancelCheckTransform.cpp
+  s_e88c9b42ad80e5::t_2f40e4f76125af 49-53
+  s_e88c9b42ad80e5::t_0c0fdcea7249ee 48
+cpp-ch/local-engine/Operator/TaskCancelCheckTransform.h
+  s_e88c9b42ad80e5::t_de0f309e18e1a2 37-38,44
+  s_e88c9b42ad80e5::t_e0ba3b1e2db064 40,45
+cpp-ch/local-engine/Parser/LocalExecutor.cpp
+  s_e88c9b42ad80e5::t_ef5677b1ffa32e 19
+  s_e88c9b42ad80e5::t_eef512166b6861 177-178
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "c7319b06045116d2b2c9002e4c572e56bf5940f1",
+  "prompts": {},
+  "logical_commit_id": "c7319b06045116d2b2c9002e4c572e56bf5940f1",
+  "sessions": {
+    "s_e88c9b42ad80e5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f7ad11bb5ffeyOnXXb0kEUcQUz",
+        "model": "glm-5.2"
+      },
+      "human_author": "lgbo-ustc <lgbo.ustc@gmail.com>",
+      "total_additions": 27,
+      "total_deletions": 13
+    }
+  }
+}
