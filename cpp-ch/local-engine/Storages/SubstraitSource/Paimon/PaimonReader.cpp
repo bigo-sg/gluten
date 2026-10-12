@@ -16,16 +16,29 @@
  */
 
 #include "PaimonReader.h"
+#include "HdfsPaimonFileSystem.h"
 
 #include <Formats/FormatFactory.h>
 #include <Formats/FormatSettings.h>
 #include <IO/ReadBufferFromString.h>
 #include <Processors/Formats/Impl/ArrowColumnToCHColumn.h>
 #include <Common/BlockTypeUtils.h>
+#include <Common/CHUtil.h>
 #include <Common/Exception.h>
+#include <Common/logger_useful.h>
 #include <arrow/api.h>
 #include <arrow/c/bridge.h>
-#include <Storages/SubstraitSource/Paimon/Bridge/GlutenPaimonBridge.h>
+#include <paimon/memory/memory_pool.h>
+#include <paimon/read_context.h>
+#include <paimon/reader/batch_reader.h>
+#include <paimon/reader/count_reader.h>
+#include <paimon/table/source/split.h>
+#include <paimon/table/source/table_read.h>
+
+#include <algorithm>
+#include <chrono>
+#include <utility>
+#include <Poco/URI.h>
 
 namespace DB::ErrorCodes
 {
@@ -37,20 +50,78 @@ namespace local_engine::paimon
 {
 namespace
 {
-class PaimonBridgeBlockInputFormat final : public DB::IInputFormat
+template <typename T>
+T takeResult(::paimon::Result<T> && result)
 {
-    GlutenPaimonReaderHandle * handle_ = nullptr;
-    DB::ArrowColumnToCHColumn arrow_to_ch_;
-    bool eof_ = false;
+    if (!result.ok())
+        throw DB::Exception(DB::ErrorCodes::BAD_ARGUMENTS, "Paimon reader: {}", result.status().ToString());
+    return std::move(result).value();
+}
+
+class PaimonCountInputFormat final : public DB::IInputFormat
+{
+    std::unique_ptr<::paimon::CountReader> reader_;
+    String table_path_;
+    int64_t remaining_rows_ = -1;
 
 public:
-    PaimonBridgeBlockInputFormat(
+    PaimonCountInputFormat(
         DB::ReadBuffer * in_,
         const DB::SharedHeader & header_,
-        GlutenPaimonReaderHandle * handle,
+        std::unique_ptr<::paimon::CountReader> reader,
+        String table_path)
+        : DB::IInputFormat(header_, in_)
+        , reader_(std::move(reader))
+        , table_path_(std::move(table_path))
+    {
+    }
+
+    String getName() const override { return "PaimonCountInputFormat"; }
+
+protected:
+    DB::Chunk read() override
+    {
+        if (remaining_rows_ < 0)
+        {
+            remaining_rows_ = takeResult(reader_->CountRows());
+            if (remaining_rows_ < 0)
+                throw DB::Exception(DB::ErrorCodes::LOGICAL_ERROR, "Paimon CountReader returned a negative row count");
+            LOG_DEBUG(&Poco::Logger::get("PaimonReader"), "Native Paimon count finished: table_path={}, rows={}", table_path_, remaining_rows_);
+            reader_.reset();
+        }
+        if (remaining_rows_ == 0)
+            return {};
+
+        constexpr int64_t count_batch_size = 8192;
+        const auto rows = std::min(remaining_rows_, count_batch_size);
+        remaining_rows_ -= rows;
+        return BlockUtil::buildRowCountChunk(rows);
+    }
+};
+
+class PaimonBlockInputFormat final : public DB::IInputFormat
+{
+    std::unique_ptr<::paimon::BatchReader> reader_;
+    String table_path_;
+    DB::ArrowColumnToCHColumn arrow_to_ch_;
+    bool eof_ = false;
+    size_t batches_read_ = 0;
+    size_t rows_read_ = 0;
+    uint64_t next_batch_time_ns_ = 0;
+    uint64_t arrow_import_time_ns_ = 0;
+    uint64_t arrow_table_time_ns_ = 0;
+    uint64_t ch_conversion_time_ns_ = 0;
+
+public:
+    PaimonBlockInputFormat(
+        DB::ReadBuffer * in_,
+        const DB::SharedHeader & header_,
+        std::unique_ptr<::paimon::BatchReader> reader,
+        String table_path,
         DB::ContextPtr context)
         : DB::IInputFormat(header_, in_)
-        , handle_(handle)
+        , reader_(std::move(reader))
+        , table_path_(std::move(table_path))
         , arrow_to_ch_(
               [&]
               {
@@ -72,58 +143,90 @@ public:
     {
     }
 
-    ~PaimonBridgeBlockInputFormat() override
-    {
-        if (handle_)
-            glutenPaimonReaderClose(handle_);
-        handle_ = nullptr;
-    }
-
-    String getName() const override { return "PaimonBridgeBlockInputFormat"; }
+    String getName() const override { return "PaimonBlockInputFormat"; }
 
 protected:
     DB::Chunk read() override
     {
-        if (eof_ || !handle_)
+        if (eof_ || !reader_)
             return {};
 
-        ArrowArray c_array{};
-        ArrowSchema c_schema{};
-        char err[512]{};
-        const auto status = glutenPaimonReaderNextBatch(handle_, &c_array, &c_schema, err, sizeof(err));
-        if (status == GLUTEN_PAIMON_EOF)
+        while (true)
         {
-            eof_ = true;
-            glutenPaimonReaderClose(handle_);
-            handle_ = nullptr;
-            return {};
+            auto start = std::chrono::steady_clock::now();
+            auto paimon_batch = takeResult(reader_->NextBatch());
+            next_batch_time_ns_ += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count();
+            if (::paimon::BatchReader::IsEofBatch(paimon_batch))
+            {
+                LOG_INFO(
+                    &Poco::Logger::get("PaimonReader"),
+                    "Native Paimon read finished: table_path={}, batches={}, rows={}, next_batch_ms={}, arrow_import_ms={}, arrow_table_ms={}, ch_conversion_ms={}",
+                    table_path_,
+                    batches_read_,
+                    rows_read_,
+                    next_batch_time_ns_ / 1000000,
+                    arrow_import_time_ns_ / 1000000,
+                    arrow_table_time_ns_ / 1000000,
+                    ch_conversion_time_ns_ / 1000000);
+                eof_ = true;
+                reader_->Close();
+                reader_.reset();
+                return {};
+            }
+
+            start = std::chrono::steady_clock::now();
+            auto import_result = arrow::ImportArray(paimon_batch.first.get(), paimon_batch.second.get());
+            arrow_import_time_ns_ += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count();
+            if (!import_result.ok())
+            {
+                if (paimon_batch.first && paimon_batch.first->release)
+                    paimon_batch.first->release(paimon_batch.first.get());
+                if (paimon_batch.second && paimon_batch.second->release)
+                    paimon_batch.second->release(paimon_batch.second.get());
+                throw DB::Exception(DB::ErrorCodes::BAD_ARGUMENTS, "Paimon Arrow import: {}", import_result.status().ToString());
+            }
+
+            const auto struct_array = std::dynamic_pointer_cast<arrow::StructArray>(import_result.ValueOrDie());
+            if (!struct_array)
+                throw DB::Exception(DB::ErrorCodes::BAD_ARGUMENTS, "Paimon reader expects a struct Arrow batch");
+
+            const auto struct_type = std::static_pointer_cast<arrow::StructType>(struct_array->type());
+            std::vector<std::shared_ptr<arrow::Field>> fields;
+            std::vector<std::shared_ptr<arrow::Array>> columns;
+            for (int i = 0; i < struct_type->num_fields(); ++i)
+            {
+                if (struct_type->field(i)->name() == "_VALUE_KIND")
+                    continue;
+                fields.push_back(struct_type->field(i));
+                columns.push_back(struct_array->field(i));
+            }
+            if (fields.empty())
+                throw DB::Exception(DB::ErrorCodes::BAD_ARGUMENTS, "Paimon batch has no data columns");
+
+            start = std::chrono::steady_clock::now();
+            auto batch = arrow::RecordBatch::Make(arrow::schema(fields), struct_array->length(), columns);
+            auto table_result = arrow::Table::FromRecordBatches({batch});
+            if (!table_result.ok())
+                throw DB::Exception(DB::ErrorCodes::BAD_ARGUMENTS, "Paimon Arrow table: {}", table_result.status().ToString());
+            auto table = table_result.ValueOrDie();
+            arrow_table_time_ns_ += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count();
+            start = std::chrono::steady_clock::now();
+            DB::Chunk chunk = arrow_to_ch_.arrowTableToCHChunk(table, table->num_rows(), nullptr, nullptr);
+            ch_conversion_time_ns_ += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count();
+            if (chunk.getNumRows() != 0)
+            {
+                ++batches_read_;
+                rows_read_ += chunk.getNumRows();
+                if (batches_read_ == 1 || batches_read_ % 1000 == 0)
+                    LOG_DEBUG(
+                        &Poco::Logger::get("PaimonReader"),
+                        "Native Paimon reader emitted batch: table_path={}, batch={}, rows={}",
+                        table_path_,
+                        batches_read_,
+                        chunk.getNumRows());
+                return chunk;
+            }
         }
-        if (status != GLUTEN_PAIMON_OK)
-            throw DB::Exception(DB::ErrorCodes::BAD_ARGUMENTS, "Paimon bridge reader: {}", err);
-
-        SCOPE_EXIT({
-            if (c_array.release)
-                c_array.release(&c_array);
-            if (c_schema.release)
-                c_schema.release(&c_schema);
-        });
-
-        auto import_result = arrow::ImportArray(&c_array, &c_schema);
-        if (!import_result.ok())
-            throw DB::Exception(DB::ErrorCodes::BAD_ARGUMENTS, "Paimon bridge Arrow import: {}", import_result.status().ToString());
-
-        const auto struct_array = std::static_pointer_cast<arrow::StructArray>(import_result.ValueOrDie());
-        const auto struct_type = std::static_pointer_cast<arrow::StructType>(struct_array->type());
-        std::vector<std::shared_ptr<arrow::Array>> columns;
-        columns.reserve(struct_type->num_fields());
-        for (int i = 0; i < struct_type->num_fields(); ++i)
-            columns.push_back(struct_array->field(i));
-        auto batch = arrow::RecordBatch::Make(arrow::schema(struct_type->fields()), struct_array->length(), columns);
-        auto table = arrow::Table::FromRecordBatches({batch}).ValueOrDie();
-        DB::Chunk chunk = arrow_to_ch_.arrowTableToCHChunk(table, table->num_rows(), nullptr, nullptr);
-        if (chunk.getNumRows() == 0)
-            return read();
-        return chunk;
     }
 };
 
@@ -137,20 +240,52 @@ FormatFile::InputFormatPtr createPaimonInputFormat(const FormatFilePtr & file, c
     const auto & serialized_split = paimon_options.serialized_split();
     const auto & table_path = paimon_options.table_path();
 
-    char err[512]{};
-    auto * handle = glutenPaimonReaderOpen(
-        table_path.c_str(),
-        reinterpret_cast<const uint8_t *>(serialized_split.data()),
-        serialized_split.size(),
-        err,
-        sizeof(err));
-    if (!handle)
-        throw DB::Exception(DB::ErrorCodes::BAD_ARGUMENTS, "Paimon bridge open: {}", err);
+    LOG_INFO(
+        &Poco::Logger::get("PaimonReader"),
+        "Opening native Paimon reader: table_path={}, serialized_split_bytes={}",
+        table_path,
+        serialized_split.size());
+
+    auto split = takeResult(::paimon::Split::Deserialize(
+        serialized_split.data(), serialized_split.size(), ::paimon::GetDefaultPool()));
+    ::paimon::ReadContextBuilder builder(table_path);
+    const bool count_only = header.columns() == 1 && header.has(BlockUtil::VIRTUAL_ROW_COUNT_COLUMN);
+    std::vector<std::string> read_fields;
+    read_fields.reserve(header.columns());
+    for (const auto & column : header)
+        if (column.name != BlockUtil::VIRTUAL_ROW_COUNT_COLUMN)
+            read_fields.push_back(column.name);
+    if (!read_fields.empty())
+        builder.SetReadFieldNames(read_fields);
+    const auto & config = file->getContext()->getConfigRef();
+    if (config.has("paimon.read_batch_size"))
+    {
+        const int batch_size = config.getInt("paimon.read_batch_size");
+        if (batch_size <= 0)
+            throw DB::Exception(DB::ErrorCodes::BAD_ARGUMENTS, "paimon.read_batch_size must be positive, got {}", batch_size);
+        builder.AddOption("read.batch-size", std::to_string(batch_size));
+    }
+    if (Poco::URI(table_path).getScheme() == "hdfs")
+        builder.WithFileSystem(createHdfsPaimonFileSystem(table_path, file->getContext()));
+    auto read_context = takeResult(builder.Finish());
+    auto table_read = takeResult(::paimon::TableRead::Create(std::move(read_context)));
 
     static const std::string empty_read_buffer;
     auto read_buffer = std::make_unique<DB::ReadBufferFromString>(empty_read_buffer);
-    auto input = std::make_shared<PaimonBridgeBlockInputFormat>(
-        read_buffer.get(), toShared(header), handle, file->getContext());
+    DB::InputFormatPtr input;
+    if (count_only)
+    {
+        auto count_reader = takeResult(table_read->CreateCountReader({split}));
+        input = std::make_shared<PaimonCountInputFormat>(read_buffer.get(), toShared(header), std::move(count_reader), table_path);
+        LOG_DEBUG(&Poco::Logger::get("PaimonReader"), "Native Paimon count reader created: table_path={}", table_path);
+    }
+    else
+    {
+        auto reader = takeResult(table_read->CreateReader(split));
+        input = std::make_shared<PaimonBlockInputFormat>(
+            read_buffer.get(), toShared(header), std::move(reader), table_path, file->getContext());
+        LOG_INFO(&Poco::Logger::get("PaimonReader"), "Native Paimon reader created: table_path={}", table_path);
+    }
     return std::make_shared<FormatFile::InputFormat>(std::move(read_buffer), input);
 }
 }

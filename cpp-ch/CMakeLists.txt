@@ -86,7 +86,7 @@ set(CH_BINARY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build")
 option(ENABLE_CPP_TEST "Build CPP Unit test" OFF)
 option(
   GLUTEN_ENABLE_NATIVE_PAIMON
-  "Build libch with Paimon native read via libgluten_paimon_bridge.so"
+  "Build libch with native Paimon read support"
   OFF)
 option(GLUTEN_BUNDLE_PAIMON
        "Download and build paimon-cpp into build/deps/paimon when Paimon_DIR is unset"
@@ -112,15 +112,16 @@ if(GLUTEN_ENABLE_NATIVE_PAIMON)
         "Native Paimon requires paimon-cpp. Set -DPaimon_DIR=... or -DGLUTEN_BUNDLE_PAIMON=ON.")
   endif()
   if(GLUTEN_USE_BUNDLED_PAIMON)
-    include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/BuildPaimonBridge.cmake)
-    set(_GLUTEN_PAIMON_BUILD_DEP paimon_bridge)
+    # The bridge sources are compiled into libch.  Keep Paimon itself in
+    # shared libraries so its implementation is not copied into libch.
+    set(_GLUTEN_PAIMON_BUILD_DEP paimon_cpp)
     list(APPEND _GLUTEN_CH_CMAKE_PAIMON_ARG
-         "-DGLUTEN_PAIMON_BRIDGE_LIB=${GLUTEN_PAIMON_BRIDGE_LIB}"
-         "-DGLUTEN_PAIMON_BRIDGE_INCLUDE_DIR=${PAIMON_BRIDGE_SOURCE_DIR}")
+         "-DPaimon_DIR=${GLUTEN_PAIMON_CMAKE_DIR}"
+         "-DPAIMON_BUNDLED_DEPS_DIR=${PAIMON_EP_BINARY_DIR}")
   else()
     message(
       FATAL_ERROR
-        "Native Paimon bridge mode requires bundled paimon-cpp (-DGLUTEN_BUNDLE_PAIMON=ON).")
+        "Native Paimon support requires bundled paimon-cpp (-DGLUTEN_BUNDLE_PAIMON=ON).")
   endif()
 else()
   message(
@@ -129,11 +130,6 @@ else()
 endif()
 
 set(LIBCH_OUTPUT_DIR "${CH_BINARY_DIR}/utils/extern-local-engine")
-
-set(_GLUTEN_BRIDGE_SO_DEP "")
-if(GLUTEN_USE_BUNDLED_PAIMON)
-  set(_GLUTEN_BRIDGE_SO_DEP ${GLUTEN_PAIMON_BRIDGE_LIB})
-endif()
 
 if(ENABLE_CPP_TEST)
   add_custom_command(
@@ -148,7 +144,7 @@ if(ENABLE_CPP_TEST)
       ${CH_SOURCE_DIR} -G Ninja -B ${CH_BINARY_DIR} && cmake --build
       ${CH_BINARY_DIR} --target ch unit_tests_local_engine\"
     OUTPUT _build_ch
-    DEPENDS ${_GLUTEN_PAIMON_BUILD_DEP} ${_GLUTEN_BRIDGE_SO_DEP})
+    DEPENDS ${_GLUTEN_PAIMON_BUILD_DEP})
 else()
   add_custom_command(
     USES_TERMINAL
@@ -171,24 +167,22 @@ else()
       ${CH_SOURCE_DIR} -G Ninja -B ${CH_BINARY_DIR} && cmake --build
       ${CH_BINARY_DIR} --target libch\"
     OUTPUT _build_ch
-    DEPENDS ${_GLUTEN_PAIMON_BUILD_DEP} ${_GLUTEN_BRIDGE_SO_DEP})
+    DEPENDS ${_GLUTEN_PAIMON_BUILD_DEP})
 endif()
 
 if(GLUTEN_USE_BUNDLED_PAIMON)
-  # When paimon-cpp is built shared, ship its .so next to libch.so for deployment.
+  # Ship the combined Paimon shared library next to libch.so for deployment.
   set(_GLUTEN_BUNDLE_PAIMON_SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/bundle_paimon_libs.sh)
   file(
     WRITE ${_GLUTEN_BUNDLE_PAIMON_SCRIPT}
     "#!/usr/bin/env bash
 set -euo pipefail
 mkdir -p '${LIBCH_OUTPUT_DIR}'
-if [ -f '${GLUTEN_PAIMON_BRIDGE_LIB}' ]; then
-  cp -a '${GLUTEN_PAIMON_BRIDGE_LIB}' '${LIBCH_OUTPUT_DIR}/'
-fi
-for lib in '${PAIMON_INSTALL_PREFIX}/lib/libpaimon'*.so*; do
-  [ -e \"\${lib}\" ] || continue
-  cp -a \"\${lib}\" '${LIBCH_OUTPUT_DIR}/'
+for old_lib in '${LIBCH_OUTPUT_DIR}/libpaimon_'*.so* '${PAIMON_INSTALL_PREFIX}/lib/libpaimon_'*.so*; do
+  [ -e "\${old_lib}" ] || continue
+  rm -f "\${old_lib}"
 done
+cp -a '${PAIMON_INSTALL_PREFIX}/lib/libpaimon.so' '${LIBCH_OUTPUT_DIR}/'
 ")
   add_custom_command(
     OUTPUT _bundle_paimon_libs
@@ -196,7 +190,7 @@ done
     COMMAND chmod +x ${_GLUTEN_BUNDLE_PAIMON_SCRIPT}
     COMMAND ${_GLUTEN_BUNDLE_PAIMON_SCRIPT}
     DEPENDS _build_ch
-    COMMENT "Copy bundled Paimon shared libraries next to libch.so (if any)")
+    COMMENT "Copy libpaimon.so next to libch.so")
   add_custom_target(bundle_paimon_libs DEPENDS _bundle_paimon_libs)
   add_custom_target(build_ch ALL DEPENDS _build_ch bundle_paimon_libs)
 else()

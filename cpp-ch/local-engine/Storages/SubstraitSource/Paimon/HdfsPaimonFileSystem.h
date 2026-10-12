@@ -16,21 +16,12 @@
  */
 #pragma once
 
-#include <string>
-#include <vector>
-#include <Core/Block.h>
+#include <paimon/fs/file_system.h>
 
-namespace local_engine
-{
-/// One Spark task attempt owns one writer. Only the Spark driver commits its messages.
-class PaimonWriter
-{
-public:
-    PaimonWriter(const std::string & table_path, const std::string & commit_user);
-    ~PaimonWriter();
+namespace DB { class Context; using ContextPtr = std::shared_ptr<const Context>; }
 
-    void write(const DB::Block & block);
-    std::vector<std::string> prepareCommit();
-    void close();
-};
+namespace local_engine::paimon
+{
+/// Read-only HDFS adapter for Paimon's native split reader.
+std::shared_ptr<::paimon::FileSystem> createHdfsPaimonFileSystem(const std::string & table_path, DB::ContextPtr context);
 }

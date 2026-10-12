@@ -36,9 +36,10 @@ import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
 import org.apache.paimon.CoreOptions
+import org.apache.paimon.io.DataOutputSerializer
 import org.apache.paimon.spark.{PaimonInputPartition, PaimonScan}
 import org.apache.paimon.table.{DataTable, FileStoreTable}
-import org.apache.paimon.table.source.DataSplit
+import org.apache.paimon.table.source.{DataSplit, RawFile, Split}
 import org.apache.paimon.utils.InternalRowPartitionComputer
 
 import java.lang.{Long => JLong}
@@ -54,7 +55,9 @@ case class PaimonScanTransformer(
     @transient override val table: Table,
     override val keyGroupedPartitioning: Option[Seq[Expression]] = None,
     override val commonPartitionValues: Option[Seq[(InternalRow, Int)]] = None,
-    override val pushDownFilters: Option[Seq[Expression]] = None)
+    override val pushDownFilters: Option[Seq[Expression]] = None,
+    nativeRead: Boolean = false,
+    supportNativePkTableRead: Boolean = false)
   extends BatchScanExecTransformerBase(
     output = output,
     scan = scan,
@@ -116,11 +119,19 @@ case class PaimonScanTransformer(
       case paimonScan: PaimonScan =>
         paimonScan.table match {
           case table: FileStoreTable =>
-            if (fileFormat == ReadFileFormat.UnknownFormat) {
+            // A zero-column scan uses Gluten's virtual row-count column, which can reach
+            // Paimon's table-schema lookup. Leave these scans to Spark/Paimon.
+            if (nativeRead && (output.isEmpty || getDataSchema.fields.isEmpty)) {
+              return ValidationResult.failed("Native Paimon read requires a data column.")
+            }
+            if (!nativeRead && fileFormat == ReadFileFormat.UnknownFormat) {
               return ValidationResult.failed("Only support parquet/orc Paimon table.")
             }
-            if (!table.primaryKeys().isEmpty || coreOptions.deletionVectorsEnabled()) {
-              return ValidationResult.failed("Not support Paimon PK/DV table.")
+            if ((!nativeRead || !supportNativePkTableRead) && !table.primaryKeys().isEmpty) {
+              return ValidationResult.failed("Not support Paimon PK table.")
+            }
+            if (!nativeRead && coreOptions.deletionVectorsEnabled()) {
+              return ValidationResult.failed("Not support Paimon DV table.")
             }
           case table =>
             return ValidationResult.failed(
@@ -145,6 +156,9 @@ case class PaimonScanTransformer(
       partitionComputer: InternalRowPartitionComputer): SplitInfo = {
     partition match {
       case p: SparkDataSourceRDDPartition =>
+        if (nativeRead) {
+          return readPaimonTableByNativeSDK(p)
+        }
         val paths = mutable.ListBuffer.empty[String]
         val starts = mutable.ListBuffer.empty[JLong]
         val lengths = mutable.ListBuffer.empty[JLong]
@@ -153,20 +167,24 @@ case class PaimonScanTransformer(
         p.inputPartitions.foreach {
           case partition: PaimonInputPartition =>
             partition.splits.foreach {
-              split =>
-                val rawFilesOpt = split.convertToRawFiles()
+              case dataSplit: DataSplit =>
+                val rawFilesOpt = dataSplit.convertToRawFiles()
                 if (rawFilesOpt.isPresent) {
-                  val partitionRow = split.asInstanceOf[DataSplit].partition()
-                  val partitionCols = partitionComputer.generatePartValues(partitionRow)
-                  val rawFiles = rawFilesOpt.get().asScala
-                  paths ++= rawFiles.map(_.path())
-                  starts ++= rawFiles.map(file => JLong.valueOf(file.offset()))
-                  lengths ++= rawFiles.map(file => JLong.valueOf(file.length()))
-                  partitionColumns ++= mutable.ArrayBuffer.fill(rawFiles.size)(partitionCols)
+                  appendLocalFilesFromRawConvertibleDataSplit(
+                    dataSplit,
+                    partitionComputer,
+                    rawFilesOpt.get().asScala,
+                    paths,
+                    starts,
+                    lengths,
+                    partitionColumns)
                 } else {
                   throw new GlutenNotSupportException(
-                    "Cannot get raw files from paimon SparkInputPartition.")
+                    "Only raw-convertible Paimon DataSplit can be read as data files.")
                 }
+              case other: Split =>
+                throw new GlutenNotSupportException(
+                  s"Unsupported Paimon split type: ${other.getClass.getSimpleName}")
             }
           case o =>
             throw new GlutenNotSupportException(s"Unsupported input partition type: $o")
@@ -190,6 +208,44 @@ case class PaimonScanTransformer(
         localFiles
       case _ => throw new GlutenNotSupportException()
     }
+  }
+
+  private def readPaimonTableByNativeSDK(partition: SparkDataSourceRDDPartition): SplitInfo = {
+    val splits = partition.inputPartitions.flatMap {
+      case input: PaimonInputPartition =>
+        input.splits.map {
+          case split: DataSplit =>
+            val out = new DataOutputSerializer(1024)
+            split.serialize(out)
+            out.getCopyOfBuffer
+          case other =>
+            throw new GlutenNotSupportException(s"Unsupported Paimon split: $other")
+        }
+      case other =>
+        throw new GlutenNotSupportException(s"Unsupported input partition type: $other")
+    }
+    val node = PaimonLocalFilesBuilder.makeNativePaimonLocalFiles(
+      partition.index,
+      coreOptions.path().toString,
+      splits.asJava,
+      partition.preferredLocations().toList.asJava)
+    node.setFileSchema(getDataSchema)
+    node
+  }
+
+  private def appendLocalFilesFromRawConvertibleDataSplit(
+      dataSplit: DataSplit,
+      partitionComputer: InternalRowPartitionComputer,
+      rawFiles: Iterable[RawFile],
+      paths: mutable.ListBuffer[String],
+      starts: mutable.ListBuffer[JLong],
+      lengths: mutable.ListBuffer[JLong],
+      partitionColumns: mutable.ListBuffer[JMap[String, String]]): Unit = {
+    val partitionCols = partitionComputer.generatePartValues(dataSplit.partition())
+    paths ++= rawFiles.map(_.path())
+    starts ++= rawFiles.map(file => JLong.valueOf(file.offset()))
+    lengths ++= rawFiles.map(file => JLong.valueOf(file.length()))
+    partitionColumns ++= mutable.ArrayBuffer.fill(rawFiles.size)(partitionCols)
   }
 
   private def paimonColumnMappingMode(fileFormat: ReadFileFormat): Option[ColumnMappingMode] = {
@@ -216,14 +272,21 @@ case class PaimonScanTransformer(
 }
 
 object PaimonScanTransformer {
-  def apply(batchScan: BatchScanExec): PaimonScanTransformer = {
+  def apply(batchScan: BatchScanExec): PaimonScanTransformer = apply(batchScan, false, false)
+
+  def apply(
+      batchScan: BatchScanExec,
+      nativeRead: Boolean,
+      supportNativePkTableRead: Boolean): PaimonScanTransformer = {
     new PaimonScanTransformer(
       batchScan.output,
       batchScan.scan,
       batchScan.runtimeFilters,
       table = batchScan.table,
       keyGroupedPartitioning = batchScan.keyGroupedPartitioning,
-      commonPartitionValues = SparkShimLoader.getSparkShims.getCommonPartitionValues(batchScan)
+      commonPartitionValues = SparkShimLoader.getSparkShims.getCommonPartitionValues(batchScan),
+      nativeRead = nativeRead,
+      supportNativePkTableRead = supportNativePkTableRead
     )
   }
 
