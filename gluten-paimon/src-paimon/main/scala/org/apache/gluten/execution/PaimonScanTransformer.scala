@@ -47,7 +47,7 @@ import java.util.{HashMap => JHashMap, Map => JMap}
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
-class PaimonScanTransformer(
+case class PaimonScanTransformer(
     override val output: Seq[AttributeReference],
     @transient override val scan: Scan,
     override val runtimeFilters: Seq[Expression],
@@ -64,22 +64,7 @@ class PaimonScanTransformer(
     commonPartitionValues = commonPartitionValues
   ) {
 
-  override def canEqual(that: Any): Boolean = that.isInstanceOf[PaimonScanTransformer]
-
-  override def productArity: Int = 7
-
-  override def productElement(n: Int): Any = n match {
-    case 0 => output
-    case 1 => scan
-    case 2 => runtimeFilters
-    case 3 => table
-    case 4 => keyGroupedPartitioning
-    case 5 => commonPartitionValues
-    case 6 => pushDownFilters
-    case _ => throw new IndexOutOfBoundsException(n.toString)
-  }
-
-  protected lazy val coreOptions: CoreOptions = scan match {
+  private lazy val coreOptions: CoreOptions = scan match {
     case scan: PaimonScan =>
       scan.table match {
         case dataTable: DataTable =>
@@ -107,24 +92,12 @@ class PaimonScanTransformer(
       throw new GlutenNotSupportException("Only support PaimonScan.")
   }
 
-  protected def copyWith(
-      output: Seq[AttributeReference],
-      runtimeFilters: Seq[Expression],
-      pushDownFilters: Option[Seq[Expression]]): PaimonScanTransformer =
-    new PaimonScanTransformer(
-      output,
-      scan,
-      runtimeFilters,
-      table,
-      keyGroupedPartitioning,
-      commonPartitionValues,
-      pushDownFilters)
-
-  override def withNewPushdownFilters(filters: Seq[Expression]): PaimonScanTransformer =
-    copyWith(output, runtimeFilters, Some(filters))
+  override def withNewPushdownFilters(filters: Seq[Expression]): PaimonScanTransformer = {
+    this.copy(pushDownFilters = Some(filters))
+  }
 
   override def withOutput(newOutput: Seq[AttributeReference]): BatchScanExecTransformerBase = {
-    copyWith(newOutput, runtimeFilters, pushDownFilters)
+    this.copy(output = newOutput)
   }
 
   override lazy val fileFormat: ReadFileFormat = {
@@ -143,8 +116,11 @@ class PaimonScanTransformer(
       case paimonScan: PaimonScan =>
         paimonScan.table match {
           case table: FileStoreTable =>
-            validateFileStoreTable(table).foreach { reason =>
-              return ValidationResult.failed(reason)
+            if (fileFormat == ReadFileFormat.UnknownFormat) {
+              return ValidationResult.failed("Only support parquet/orc Paimon table.")
+            }
+            if (!table.primaryKeys().isEmpty || coreOptions.deletionVectorsEnabled()) {
+              return ValidationResult.failed("Not support Paimon PK/DV table.")
             }
           case table =>
             return ValidationResult.failed(
@@ -154,16 +130,6 @@ class PaimonScanTransformer(
         return ValidationResult.failed("Only support PaimonScan.")
     }
     super.doValidateInternal()
-  }
-
-  protected def validateFileStoreTable(table: FileStoreTable): Option[String] = {
-    if (fileFormat == ReadFileFormat.UnknownFormat) {
-      Some("Only support parquet/orc Paimon table.")
-    } else if (!table.primaryKeys().isEmpty || coreOptions.deletionVectorsEnabled()) {
-      Some("Not support Paimon PK/DV table.")
-    } else {
-      None
-    }
   }
 
   override def doExecuteColumnar(): RDD[ColumnarBatch] = throw new UnsupportedOperationException()
@@ -236,12 +202,12 @@ class PaimonScanTransformer(
   }
 
   override def doCanonicalize(): PaimonScanTransformer = {
-    copyWith(
-      output.map(QueryPlan.normalizeExpressions(_, output)),
-      QueryPlan.normalizePredicates(
+    this.copy(
+      output = output.map(QueryPlan.normalizeExpressions(_, output)),
+      runtimeFilters = QueryPlan.normalizePredicates(
         runtimeFilters.filterNot(_ == DynamicPruningExpression(Literal.TrueLiteral)),
         output),
-      pushDownFilters.map(QueryPlan.normalizePredicates(_, output))
+      pushDownFilters = pushDownFilters.map(QueryPlan.normalizePredicates(_, output))
     )
   }
 

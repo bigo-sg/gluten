@@ -22,15 +22,20 @@ import org.apache.gluten.substrait.rel.{PaimonLocalFilesBuilder, SplitInfo}
 import org.apache.gluten.substrait.rel.LocalFilesNode.ReadFileFormat
 
 import org.apache.spark.Partition
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, DynamicPruningExpression, Expression, Literal}
+import org.apache.spark.sql.catalyst.plans.QueryPlan
 import org.apache.spark.sql.connector.catalog.Table
 import org.apache.spark.sql.connector.read.Scan
 import org.apache.spark.sql.execution.datasources.v2.BatchScanExec
+import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.vectorized.ColumnarBatch
 
+import org.apache.paimon.CoreOptions
 import org.apache.paimon.io.DataOutputSerializer
-import org.apache.paimon.spark.PaimonInputPartition
-import org.apache.paimon.table.FileStoreTable
+import org.apache.paimon.spark.{PaimonInputPartition, PaimonScan}
+import org.apache.paimon.table.{DataTable, FileStoreTable}
 import org.apache.paimon.table.source.DataSplit
 
 import scala.collection.JavaConverters._
@@ -44,34 +49,77 @@ case class CHPaimonScanTransformer(
     override val commonPartitionValues: Option[Seq[(InternalRow, Int)]] = None,
     override val pushDownFilters: Option[Seq[Expression]] = None,
     allowPaimonCppPkRead: Boolean = false)
-  extends PaimonScanTransformer(
-    output,
-    scan,
-    runtimeFilters,
-    table,
-    keyGroupedPartitioning,
-    commonPartitionValues,
-    pushDownFilters) {
+  extends BatchScanExecTransformerBase(
+    output = output,
+    scan = scan,
+    runtimeFilters = runtimeFilters,
+    table = table,
+    keyGroupedPartitioning = keyGroupedPartitioning,
+    commonPartitionValues = commonPartitionValues
+  ) {
 
-  override protected def copyWith(
-      output: Seq[AttributeReference],
-      runtimeFilters: Seq[Expression],
-      pushDownFilters: Option[Seq[Expression]]): PaimonScanTransformer =
-    copy(
-      output = output,
-      runtimeFilters = runtimeFilters,
-      pushDownFilters = pushDownFilters)
+  private lazy val coreOptions: CoreOptions = scan match {
+    case paimonScan: PaimonScan =>
+      paimonScan.table match {
+        case dataTable: DataTable => dataTable.coreOptions()
+        case _ => throw new GlutenNotSupportException("Only support Paimon DataTable.")
+      }
+    case _ => throw new GlutenNotSupportException("Only support PaimonScan.")
+  }
 
-  override protected def validateFileStoreTable(table: FileStoreTable): Option[String] = {
-    // A zero-column scan can reach Paimon's table-schema lookup through the virtual column.
-    if (output.isEmpty || getDataSchema.fields.isEmpty) {
-      Some("Native Paimon read requires a data column.")
-    } else if (!allowPaimonCppPkRead && !table.primaryKeys().isEmpty) {
-      Some("Not support Paimon PK table.")
+  override def getPartitionSchema: StructType = scan match {
+    case paimonScan: PaimonScan =>
+      val partitionKeys = paimonScan.table.partitionKeys()
+      StructType(scan.readSchema().filter(field => partitionKeys.contains(field.name)))
+    case _ => throw new GlutenNotSupportException("Only support PaimonScan.")
+  }
+
+  override def getDataSchema: StructType = scan match {
+    case paimonScan: PaimonScan =>
+      val partitionKeys = paimonScan.table.partitionKeys()
+      StructType(scan.readSchema().filterNot(field => partitionKeys.contains(field.name)))
+    case _ => throw new GlutenNotSupportException("Only support PaimonScan.")
+  }
+
+  override def withNewPushdownFilters(filters: Seq[Expression]): CHPaimonScanTransformer =
+    copy(pushDownFilters = Some(filters))
+
+  override def withOutput(newOutput: Seq[AttributeReference]): BatchScanExecTransformerBase =
+    copy(output = newOutput)
+
+  override lazy val fileFormat: ReadFileFormat = {
+    val formatStr = coreOptions.fileFormatString()
+    if ("parquet".equalsIgnoreCase(formatStr)) {
+      ReadFileFormat.ParquetReadFormat
+    } else if ("orc".equalsIgnoreCase(formatStr)) {
+      ReadFileFormat.OrcReadFormat
     } else {
-      None
+      ReadFileFormat.UnknownFormat
     }
   }
+
+  override def doValidateInternal(): ValidationResult = {
+    scan match {
+      case paimonScan: PaimonScan =>
+        paimonScan.table match {
+          case table: FileStoreTable =>
+            // A zero-column scan can reach Paimon's table-schema lookup through the virtual column.
+            if (output.isEmpty || getDataSchema.fields.isEmpty) {
+              return ValidationResult.failed("Native Paimon read requires a data column.")
+            }
+            if (!allowPaimonCppPkRead && !table.primaryKeys().isEmpty) {
+              return ValidationResult.failed("Not support Paimon PK table.")
+            }
+          case table =>
+            return ValidationResult.failed(
+              s"Not support Paimon ${table.getClass.getSimpleName} table.")
+        }
+      case _ => return ValidationResult.failed("Only support PaimonScan.")
+    }
+    super.doValidateInternal()
+  }
+
+  override def doExecuteColumnar(): RDD[ColumnarBatch] = throw new UnsupportedOperationException()
 
   override def getSplitInfosFromPartitions(
       partitions: Seq[(Partition, ReadFileFormat)]): Seq[SplitInfo] = {
@@ -102,6 +150,19 @@ case class CHPaimonScanTransformer(
       }
     }
   }
+
+  override def doCanonicalize(): CHPaimonScanTransformer = {
+    copy(
+      output = output.map(QueryPlan.normalizeExpressions(_, output)),
+      runtimeFilters = QueryPlan.normalizePredicates(
+        runtimeFilters.filterNot(_ == DynamicPruningExpression(Literal.TrueLiteral)),
+        output),
+      pushDownFilters = pushDownFilters.map(QueryPlan.normalizePredicates(_, output))
+    )
+  }
+
+  override protected[this] def supportsBatchScan(scan: Scan): Boolean =
+    PaimonScanTransformer.supportsBatchScan(scan)
 }
 
 object CHPaimonScanTransformer {

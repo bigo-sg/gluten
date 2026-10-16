@@ -33,10 +33,13 @@ class ClickHousePaimonSuite extends GlutenClickHouseWholeStageTransformerSuite {
   }
 
   private def checkNativePaimonScan(df: DataFrame): Unit = {
-    checkGlutenPlan[PaimonScanTransformer](df)
+    checkGlutenPlan[BatchScanExecTransformerBase](df)
     assert(df.queryExecution.executedPlan.exists {
       case stage: WholeStageTransformer =>
-        stage.child.exists(_.isInstanceOf[PaimonScanTransformer])
+        stage.child.exists {
+          case _: PaimonScanTransformer | _: CHPaimonScanTransformer => true
+          case _ => false
+        }
       case _ => false
     })
   }
@@ -106,7 +109,10 @@ class ClickHousePaimonSuite extends GlutenClickHouseWholeStageTransformerSuite {
           "spark.gluten.sql.columnar.backend.ch.paimon.native.read.enabled" -> nativeRead) {
           runQueryAndCompare("SELECT id, name FROM paimon_ch_pk") { df =>
             assert(df.collect().toSeq == Seq(Row(1, "new")))
-            assert(!df.queryExecution.executedPlan.exists(_.isInstanceOf[PaimonScanTransformer]))
+            assert(!df.queryExecution.executedPlan.exists {
+              case _: PaimonScanTransformer | _: CHPaimonScanTransformer => true
+              case _ => false
+            })
             assert(df.queryExecution.executedPlan.exists(_.isInstanceOf[BatchScanExec]))
           }
         }
