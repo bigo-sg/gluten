@@ -125,8 +125,8 @@ class Snapshot(
    * This is a lazy val, so repeated calls will not trigger multiple IO operations.
    */
   protected lazy val getInCommitTimestampOpt: Option[Long] =
-    if (DeltaConfigs.IN_COMMIT_TIMESTAMPS_ENABLED.fromMetaData(metadata)) {
-      Some(_reconstructedProtocolMetadataAndICT.inCommitTimestamp
+    Option.when(DeltaConfigs.IN_COMMIT_TIMESTAMPS_ENABLED.fromMetaData(metadata)) {
+      _reconstructedProtocolMetadataAndICT.inCommitTimestamp
         .getOrElse {
           val startTime = System.currentTimeMillis()
           var exception = Option.empty[Throwable]
@@ -156,9 +156,7 @@ class Snapshot(
               )
             )
           }
-        })
-    } else {
-      None
+        }
     }
 
 
@@ -573,25 +571,23 @@ class Snapshot(
     // in the checksum or if they have already been computed in the current snapshot.
     setTransactions = checksumOpt.flatMap(_.setTransactions)
       .orElse {
-        if (_computedStateTriggered &&
+        Option.when(_computedStateTriggered &&
             // Only extract it from the current snapshot if set transaction
             // writes are enabled.
             spark.conf.get(DeltaSQLConf.DELTA_WRITE_SET_TRANSACTIONS_IN_CRC)) {
-          Some(setTransactions)
-        } else {
-          None
+          setTransactions
         }
       },
     domainMetadata = checksumOpt.flatMap(_.domainMetadata)
-      .orElse(if (_computedStateTriggered) Some(domainMetadata) else None),
+      .orElse(Option.when(_computedStateTriggered)(domainMetadata)),
     numDeletedRecordsOpt = checksumOpt.flatMap(_.numDeletedRecordsOpt)
-      .orElse(if (_computedStateTriggered) numDeletedRecordsOpt else None)
+      .orElse(Option.when(_computedStateTriggered)(numDeletedRecordsOpt).flatten)
       .filter(_ => deletionVectorsReadableAndMetricsEnabled),
     numDeletionVectorsOpt = checksumOpt.flatMap(_.numDeletionVectorsOpt)
-      .orElse(if (_computedStateTriggered) numDeletionVectorsOpt else None)
+      .orElse(Option.when(_computedStateTriggered)(numDeletionVectorsOpt).flatten)
       .filter(_ => deletionVectorsReadableAndMetricsEnabled),
     deletedRecordCountsHistogramOpt = checksumOpt.flatMap(_.deletedRecordCountsHistogramOpt)
-      .orElse(if (_computedStateTriggered) deletedRecordCountsHistogramOpt else None)
+      .orElse(Option.when(_computedStateTriggered)(deletedRecordCountsHistogramOpt).flatten)
       .filter(_ => deletionVectorsReadableAndHistogramEnabled),
     histogramOpt = checksumOpt.flatMap(_.histogramOpt)
   )
