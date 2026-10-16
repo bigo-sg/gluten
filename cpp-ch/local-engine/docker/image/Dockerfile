@@ -61,8 +61,6 @@ RUN apt-get update \
         openjdk-8-jdk\
         ccache \
         clang-${LLVM_VERSION} \
-        libc++-${LLVM_VERSION}-dev \
-        libc++abi-${LLVM_VERSION}-dev \
         cmake \
         fakeroot \
         git \

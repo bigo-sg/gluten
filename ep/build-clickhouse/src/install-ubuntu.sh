@@ -21,7 +21,6 @@ sudo apt-get install git cmake ccache python3 ninja-build nasm yasm gawk lsb-rel
 
 echo "Install and Use the Clang compiler"
 sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
-sudo apt-get install libc++-18-dev libc++abi-18-dev
 
 echo "add CC and CXX to .bashrc"
 echo "export CC=clang-18" >> ~/.bashrc

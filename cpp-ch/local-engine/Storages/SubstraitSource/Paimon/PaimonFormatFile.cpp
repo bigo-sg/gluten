@@ -16,13 +16,13 @@
  */
 
 #include "PaimonFormatFile.h"
+#include "PaimonReader.h"
 
 #include <Common/Exception.h>
 
 namespace DB::ErrorCodes
 {
 extern const int BAD_ARGUMENTS;
-extern const int LOGICAL_ERROR;
 }
 
 namespace local_engine
@@ -39,9 +39,9 @@ PaimonFormatFile::PaimonFormatFile(
 }
 
 FormatFile::InputFormatPtr PaimonFormatFile::createInputFormat(
-    const DB::Block &, const std::shared_ptr<const DB::ActionsDAG> &)
+    const DB::Block & header, const std::shared_ptr<const DB::ActionsDAG> & /*filter_actions_dag*/)
 {
-    throw DB::Exception(DB::ErrorCodes::LOGICAL_ERROR, "PaimonFormatFile must be read through PaimonReader in FileReader");
+    return paimon::createPaimonInputFormat(*this, header);
 }
 
 }

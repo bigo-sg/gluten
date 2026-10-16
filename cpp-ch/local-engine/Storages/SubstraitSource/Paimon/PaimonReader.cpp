@@ -36,7 +36,6 @@
 #include <paimon/table/source/table_read.h>
 
 #include <algorithm>
-#include <chrono>
 #include <utility>
 #include <Poco/URI.h>
 
@@ -107,10 +106,6 @@ class PaimonBlockInputFormat final : public DB::IInputFormat
     bool eof_ = false;
     size_t batches_read_ = 0;
     size_t rows_read_ = 0;
-    uint64_t next_batch_time_ns_ = 0;
-    uint64_t arrow_import_time_ns_ = 0;
-    uint64_t arrow_table_time_ns_ = 0;
-    uint64_t ch_conversion_time_ns_ = 0;
 
 public:
     PaimonBlockInputFormat(
@@ -153,30 +148,22 @@ protected:
 
         while (true)
         {
-            auto start = std::chrono::steady_clock::now();
             auto paimon_batch = takeResult(reader_->NextBatch());
-            next_batch_time_ns_ += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count();
             if (::paimon::BatchReader::IsEofBatch(paimon_batch))
             {
                 LOG_INFO(
                     &Poco::Logger::get("PaimonReader"),
-                    "Native Paimon read finished: table_path={}, batches={}, rows={}, next_batch_ms={}, arrow_import_ms={}, arrow_table_ms={}, ch_conversion_ms={}",
+                    "Native Paimon read finished: table_path={}, batches={}, rows={}",
                     table_path_,
                     batches_read_,
-                    rows_read_,
-                    next_batch_time_ns_ / 1000000,
-                    arrow_import_time_ns_ / 1000000,
-                    arrow_table_time_ns_ / 1000000,
-                    ch_conversion_time_ns_ / 1000000);
+                    rows_read_);
                 eof_ = true;
                 reader_->Close();
                 reader_.reset();
                 return {};
             }
 
-            start = std::chrono::steady_clock::now();
             auto import_result = arrow::ImportArray(paimon_batch.first.get(), paimon_batch.second.get());
-            arrow_import_time_ns_ += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count();
             if (!import_result.ok())
             {
                 if (paimon_batch.first && paimon_batch.first->release)
@@ -203,16 +190,12 @@ protected:
             if (fields.empty())
                 throw DB::Exception(DB::ErrorCodes::BAD_ARGUMENTS, "Paimon batch has no data columns");
 
-            start = std::chrono::steady_clock::now();
             auto batch = arrow::RecordBatch::Make(arrow::schema(fields), struct_array->length(), columns);
             auto table_result = arrow::Table::FromRecordBatches({batch});
             if (!table_result.ok())
                 throw DB::Exception(DB::ErrorCodes::BAD_ARGUMENTS, "Paimon Arrow table: {}", table_result.status().ToString());
             auto table = table_result.ValueOrDie();
-            arrow_table_time_ns_ += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count();
-            start = std::chrono::steady_clock::now();
             DB::Chunk chunk = arrow_to_ch_.arrowTableToCHChunk(table, table->num_rows(), nullptr, nullptr);
-            ch_conversion_time_ns_ += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count();
             if (chunk.getNumRows() != 0)
             {
                 ++batches_read_;
@@ -230,11 +213,13 @@ protected:
     }
 };
 
-FormatFile::InputFormatPtr createPaimonInputFormat(const FormatFilePtr & file, const DB::Block & header)
+}
+
+FormatFile::InputFormatPtr createPaimonInputFormat(const FormatFile & file, const DB::Block & header)
 {
-    const auto & file_info = file->getFileInfo();
+    const auto & file_info = file.getFileInfo();
     if (!file_info.has_paimon())
-        throw DB::Exception(DB::ErrorCodes::LOGICAL_ERROR, "PaimonReader requires paimon read options in LocalFiles");
+        throw DB::Exception(DB::ErrorCodes::LOGICAL_ERROR, "Paimon input format requires paimon read options in LocalFiles");
 
     const auto & paimon_options = file_info.paimon();
     const auto & serialized_split = paimon_options.serialized_split();
@@ -257,7 +242,7 @@ FormatFile::InputFormatPtr createPaimonInputFormat(const FormatFilePtr & file, c
             read_fields.push_back(column.name);
     if (!read_fields.empty())
         builder.SetReadFieldNames(read_fields);
-    const auto & config = file->getContext()->getConfigRef();
+    const auto & config = file.getContext()->getConfigRef();
     if (config.has("paimon.read_batch_size"))
     {
         const int batch_size = config.getInt("paimon.read_batch_size");
@@ -266,7 +251,7 @@ FormatFile::InputFormatPtr createPaimonInputFormat(const FormatFilePtr & file, c
         builder.AddOption("read.batch-size", std::to_string(batch_size));
     }
     if (Poco::URI(table_path).getScheme() == "hdfs")
-        builder.WithFileSystem(createHdfsPaimonFileSystem(table_path, file->getContext()));
+        builder.WithFileSystem(createHdfsPaimonFileSystem(table_path, file.getContext()));
     auto read_context = takeResult(builder.Finish());
     auto table_read = takeResult(::paimon::TableRead::Create(std::move(read_context)));
 
@@ -283,29 +268,10 @@ FormatFile::InputFormatPtr createPaimonInputFormat(const FormatFilePtr & file, c
     {
         auto reader = takeResult(table_read->CreateReader(split));
         input = std::make_shared<PaimonBlockInputFormat>(
-            read_buffer.get(), toShared(header), std::move(reader), table_path, file->getContext());
+            read_buffer.get(), toShared(header), std::move(reader), table_path, file.getContext());
         LOG_INFO(&Poco::Logger::get("PaimonReader"), "Native Paimon reader created: table_path={}", table_path);
     }
     return std::make_shared<FormatFile::InputFormat>(std::move(read_buffer), input);
-}
-}
-
-std::unique_ptr<PaimonReader> PaimonReader::create(
-    const FormatFilePtr & file_, const DB::Block & to_read_header_, const DB::Block & output_header_)
-{
-    auto input = createPaimonInputFormat(file_, to_read_header_);
-    if (!input)
-        return nullptr;
-    return std::make_unique<PaimonReader>(file_, to_read_header_, output_header_, input);
-}
-
-PaimonReader::PaimonReader(
-    const FormatFilePtr & file_,
-    const DB::Block & to_read_header_,
-    const DB::Block & output_header_,
-    const FormatFile::InputFormatPtr & input_format_)
-    : NormalFileReader(file_, to_read_header_, output_header_, input_format_)
-{
 }
 
 }

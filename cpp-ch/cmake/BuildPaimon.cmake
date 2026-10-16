@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Download, build, and install paimon-cpp before libch's native Paimon reader.
+# Use ClickHouse's libc++ runtime while keeping Paimon's own Arrow dependency.
 include(ExternalProject)
 
 set(PAIMON_INSTALL_PREFIX
@@ -26,17 +28,8 @@ set(PAIMON_GIT_TAG
     CACHE STRING "paimon-cpp git tag (must match find_package version 0.3.0)")
 
 string(REGEX REPLACE "[^A-Za-z0-9_.-]" "_" PAIMON_BUILD_TAG "${PAIMON_GIT_TAG}")
-set(PAIMON_EP_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build/deps/paimon-${PAIMON_BUILD_TAG}-src")
-set(PAIMON_EP_BINARY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build/deps/paimon-${PAIMON_BUILD_TAG}-arrow16-build")
-set(GLUTEN_CLICKHOUSE_ARROW_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/ClickHouse/contrib/arrow")
-if(NOT EXISTS "${GLUTEN_CLICKHOUSE_ARROW_SOURCE}/cpp/CMakeLists.txt")
-  message(FATAL_ERROR "Missing ClickHouse Arrow source: ${GLUTEN_CLICKHOUSE_ARROW_SOURCE}")
-endif()
-file(READ "${GLUTEN_CLICKHOUSE_ARROW_SOURCE}/cpp/CMakeLists.txt" _GLUTEN_ARROW_CMAKE)
-string(FIND "${_GLUTEN_ARROW_CMAKE}" "set(ARROW_VERSION \"16.1.0\")" _GLUTEN_ARROW_VERSION_POS)
-if(_GLUTEN_ARROW_VERSION_POS EQUAL -1)
-  message(FATAL_ERROR "Native Paimon requires ClickHouse Arrow 16.1.0")
-endif()
+set(PAIMON_EP_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build/deps/paimon-${PAIMON_BUILD_TAG}-src-upstream-arrow")
+set(PAIMON_EP_BINARY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build/deps/paimon-${PAIMON_BUILD_TAG}-build-upstream-arrow")
 set(GLUTEN_PAIMON_LIBCXX_INCLUDE
     "${CMAKE_CURRENT_SOURCE_DIR}/build/contrib/llvm-project/libcxx/include/c++/v1")
 set(GLUTEN_PAIMON_LIBCXX_SOURCE_INCLUDE
@@ -49,8 +42,10 @@ set(GLUTEN_PAIMON_LIBCXXABI_ARCHIVE
     "${CMAKE_CURRENT_SOURCE_DIR}/build/contrib/libcxxabi-cmake/libcxxabi.a")
 set(GLUTEN_PAIMON_LIBUNWIND_ARCHIVE
     "${CMAKE_CURRENT_SOURCE_DIR}/build/contrib/libunwind-cmake/libunwind.a")
+# Prefer Paimon's bundled Arrow and fmt headers over system installations;
+# ClickHouse supplies only the libc++ runtime and uses its own Arrow build.
 set(GLUTEN_PAIMON_CXX_FLAGS
-    "-stdlib=libc++ -nostdlib++ -nostdinc++ -isystem ${GLUTEN_PAIMON_LIBCXX_INCLUDE} -isystem ${GLUTEN_PAIMON_LIBCXX_SOURCE_INCLUDE} -isystem ${GLUTEN_PAIMON_LIBCXXABI_INCLUDE} -include cstdlib")
+    "-stdlib=libc++ -fuse-ld=lld -nostdlib++ -nostdinc++ -I${PAIMON_EP_BINARY_DIR}/arrow_ep-install/include -I${PAIMON_EP_BINARY_DIR}/fmt_ep-install/include -isystem ${GLUTEN_PAIMON_LIBCXX_INCLUDE} -isystem ${GLUTEN_PAIMON_LIBCXX_SOURCE_INCLUDE} -isystem ${GLUTEN_PAIMON_LIBCXXABI_INCLUDE} -include cstdlib")
 set(GLUTEN_PAIMON_CXX_STANDARD_LIBRARIES
     "${GLUTEN_PAIMON_LIBCXX_ARCHIVE} ${GLUTEN_PAIMON_LIBCXXABI_ARCHIVE} ${GLUTEN_PAIMON_LIBUNWIND_ARCHIVE} -ldl -pthread -lm")
 if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -91,7 +86,6 @@ ExternalProject_Add(
     -DGLUTEN_PAIMON_LIBCXXABI_ARCHIVE=${GLUTEN_PAIMON_LIBCXXABI_ARCHIVE}
     -DGLUTEN_PAIMON_LIBUNWIND_ARCHIVE=${GLUTEN_PAIMON_LIBUNWIND_ARCHIVE}
     -DGLUTEN_PAIMON_CXX_STANDARD_LIBRARIES=${GLUTEN_PAIMON_CXX_STANDARD_LIBRARIES}
-    -DGLUTEN_CLICKHOUSE_ARROW_SOURCE=${GLUTEN_CLICKHOUSE_ARROW_SOURCE}
     -DGLUTEN_PAIMON_COMPAT_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/PaimonGlibcCompat.c
     -DLIBUNWIND_LIBRARY=${GLUTEN_PAIMON_LIBUNWIND_ARCHIVE}
     -DCMAKE_PREFIX_PATH=
@@ -110,7 +104,6 @@ ExternalProject_Add(
     -DGLUTEN_PAIMON_LIBCXXABI_ARCHIVE=${GLUTEN_PAIMON_LIBCXXABI_ARCHIVE}
     -DGLUTEN_PAIMON_LIBUNWIND_ARCHIVE=${GLUTEN_PAIMON_LIBUNWIND_ARCHIVE}
     -DGLUTEN_PAIMON_CXX_STANDARD_LIBRARIES=${GLUTEN_PAIMON_CXX_STANDARD_LIBRARIES}
-    -DGLUTEN_CLICKHOUSE_ARROW_SOURCE=${GLUTEN_CLICKHOUSE_ARROW_SOURCE}
     -DGLUTEN_PAIMON_COMPAT_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/cmake/PaimonGlibcCompat.c
     -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/PatchPaimonArrowThrift.cmake
   BUILD_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --parallel

@@ -205,7 +205,7 @@ splits to the ClickHouse native file reader, which executes the scan. This is
 file-level acceleration, not a native Paimon reader: primary-key tables and
 deletion vectors are not offloaded by the raw-file path.
 
-An experimental native reader uses the Paimon C++ API from `libch.so` and
+A native reader uses the Paimon C++ API from `libch.so` and
 links it against a separate shared
 [`paimon-cpp`](https://github.com/apache/paimon-cpp) v0.3.0 build. The build
 host needs libc++ development headers and libraries for the selected Clang
@@ -225,7 +225,7 @@ with the HDFS site XML on every executor. The optional
 `spark.gluten.sql.columnar.backend.ch.runtime_config.paimon.read_batch_size=8192`
 sets the Paimon C++ reader batch size; when omitted, the SDK default applies.
 Primary-key tables use Spark Paimon reads by default.
-To opt in to experimental native primary-key reads, also set
+To opt in to native primary-key reads, also set
 `spark.gluten.sql.columnar.backend.ch.paimon.native.pk.read.enabled=true`.
 Ship `libch.so` and `libpaimon.so` on every executor.
 The bundled `libpaimon.so` binds the math functions used by Paimon to their

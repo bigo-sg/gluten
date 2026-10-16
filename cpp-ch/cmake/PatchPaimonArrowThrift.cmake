@@ -13,6 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Adapt upstream paimon-cpp's CMake files before configuring its build.
+# Bundle its dependencies and plugins into libpaimon.so, link ClickHouse's
+# libc++ runtime, and add selected glibc compatibility wrappers. Paimon keeps
+# its upstream Arrow version despite this script's historical name.
 set(_toolchain "${PAIMON_SOURCE_DIR}/cmake_modules/ThirdpartyToolchain.cmake")
 file(READ "${_toolchain}" _contents)
 set(_original_contents "${_contents}")
@@ -55,106 +59,8 @@ if(_linker_flags_position EQUAL -1)
       "\"-DCMAKE_CXX_STANDARD_LIBRARIES=\${GLUTEN_PAIMON_CXX_STANDARD_LIBRARIES}\"\n    -DCMAKE_EXE_LINKER_FLAGS="
       _contents "${_contents}")
 endif()
-if(NOT GLUTEN_CLICKHOUSE_ARROW_SOURCE OR NOT EXISTS "${GLUTEN_CLICKHOUSE_ARROW_SOURCE}/cpp/CMakeLists.txt")
-  message(FATAL_ERROR "GLUTEN_CLICKHOUSE_ARROW_SOURCE must point to ClickHouse Arrow 16.1")
-endif()
-set(_arrow_fetch_anchor [=[
-    externalproject_add(arrow_ep
-                        URL ${ARROW_SOURCE_URL}
-                        URL_HASH "SHA256=${PAIMON_ARROW_BUILD_SHA256_CHECKSUM}"
-]=])
-set(_arrow_fetch_replacement [=[
-    # Build the same Arrow source revision used by ClickHouse from an isolated
-    # copy, since Paimon applies its own Parquet patches to this source tree.
-    externalproject_add(arrow_ep
-                        SOURCE_DIR "${ARROW_SOURCE_DIR}"
-                        DOWNLOAD_COMMAND ${CMAKE_COMMAND} -E copy_directory
-                                         "${GLUTEN_CLICKHOUSE_ARROW_SOURCE}" <SOURCE_DIR>
-                        UPDATE_COMMAND ""
-]=])
-if(NOT _contents MATCHES "Build the same Arrow source revision used by ClickHouse")
-  string(FIND "${_contents}" "${_arrow_fetch_anchor}" _arrow_fetch_position)
-  if(_arrow_fetch_position EQUAL -1)
-    message(FATAL_ERROR "Cannot use ClickHouse Arrow source: ${_toolchain} changed")
-  endif()
-  string(REPLACE "${_arrow_fetch_anchor}" "${_arrow_fetch_replacement}" _contents "${_contents}")
-endif()
 if(NOT _contents STREQUAL _original_contents)
   file(WRITE "${_toolchain}" "${_contents}")
-endif()
-
-set(_versions "${PAIMON_SOURCE_DIR}/third_party/versions.txt")
-file(READ "${_versions}" _versions_contents)
-set(_original_versions_contents "${_versions_contents}")
-string(REPLACE "PAIMON_ARROW_BUILD_VERSION=17.0.0" "PAIMON_ARROW_BUILD_VERSION=16.1.0" _versions_contents "${_versions_contents}")
-if(NOT _versions_contents STREQUAL _original_versions_contents)
-  file(WRITE "${_versions}" "${_versions_contents}")
-endif()
-
-# Arrow 16.1's C Data helper header uses assert without including assert.h.
-# Paimon includes it without a preceding assertion header in several files.
-set(_arrow_diff "${PAIMON_SOURCE_DIR}/cmake_modules/arrow.diff")
-file(READ "${_arrow_diff}" _arrow_diff_contents)
-if(NOT _arrow_diff_contents MATCHES "cpp/src/arrow/c/helpers.h")
-  string(APPEND _arrow_diff_contents [=[
-
-diff --git a/cpp/src/arrow/c/helpers.h b/cpp/src/arrow/c/helpers.h
---- a/cpp/src/arrow/c/helpers.h
-+++ b/cpp/src/arrow/c/helpers.h
-@@ -17,6 +17,7 @@
- #pragma once
- 
-+#include <assert.h>
- #include <stdio.h>
- #include <stdlib.h>
- #include <string.h>
-]=])
-  file(WRITE "${_arrow_diff}" "${_arrow_diff_contents}")
-endif()
-
-# Paimon adds schema metadata after writing batches.  Arrow 16.1 exposes
-# this on ParquetFileWriter, but not through its Arrow FileWriter wrapper.
-if(NOT _arrow_diff_contents MATCHES "Paimon metadata compatibility")
-  string(APPEND _arrow_diff_contents [=[
-
-diff --git a/cpp/src/parquet/arrow/writer.h b/cpp/src/parquet/arrow/writer.h
---- a/cpp/src/parquet/arrow/writer.h
-+++ b/cpp/src/parquet/arrow/writer.h
-@@ -24,6 +24,7 @@
- namespace arrow {
- 
- class Array;
-+class KeyValueMetadata;
- class ChunkedArray;
- class RecordBatch;
- class Schema;
-@@ -138,5 +139,8 @@
-   /// or Close() is called.
-   virtual ::arrow::Status WriteRecordBatch(const ::arrow::RecordBatch& batch) = 0;
- 
-+  /// Paimon metadata compatibility: add footer metadata before Close().
-+  virtual ::arrow::Status AddKeyValueMetadata(
-+      const std::shared_ptr<const ::arrow::KeyValueMetadata>& metadata) = 0;
-   /// \brief Write the footer and close the file.
-   virtual ::arrow::Status Close() = 0;
-diff --git a/cpp/src/parquet/arrow/writer.cc b/cpp/src/parquet/arrow/writer.cc
---- a/cpp/src/parquet/arrow/writer.cc
-+++ b/cpp/src/parquet/arrow/writer.cc
-@@ -493,5 +493,12 @@
-     return writer_->metadata();
-   }
- 
-+  Status AddKeyValueMetadata(
-+      const std::shared_ptr<const ::arrow::KeyValueMetadata>& metadata) override {
-+    RETURN_NOT_OK(CheckClosed());
-+    PARQUET_CATCH_NOT_OK(writer_->AddKeyValueMetadata(metadata));
-+    return Status::OK();
-+  }
-+
-  private:
-   friend class FileWriter;
-]=])
-  file(WRITE "${_arrow_diff}" "${_arrow_diff_contents}")
 endif()
 
 # Keep the main Paimon shared library and fold its plugin object files into it.

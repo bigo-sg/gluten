@@ -70,7 +70,7 @@ class ClickHousePaimonSuite extends GlutenClickHouseWholeStageTransformerSuite {
         runQueryAndCompare("SELECT id, name FROM paimon_ch_native_read ORDER BY id") { df =>
           checkNativePaimonScan(df)
           assert(df.queryExecution.executedPlan.exists {
-            case scan: PaimonScanTransformer => scan.nativeRead
+            case _: CHPaimonScanTransformer => true
             case _ => false
           })
         }
@@ -132,7 +132,7 @@ class ClickHousePaimonSuite extends GlutenClickHouseWholeStageTransformerSuite {
           assert(df.collect().toSeq == Seq(Row(1, "new")))
           checkNativePaimonScan(df)
           assert(df.queryExecution.executedPlan.exists {
-            case scan: PaimonScanTransformer => scan.nativeRead
+            case _: CHPaimonScanTransformer => true
             case _ => false
           })
         }

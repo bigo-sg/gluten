@@ -21,17 +21,14 @@ import org.apache.gluten.extension.columnar.offload.OffloadSingleNode
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.execution.datasources.v2.BatchScanExec
 
-case class OffloadPaimonScan(
-    nativeRead: Boolean = false,
-    supportNativePkTableRead: Boolean = false)
-  extends OffloadSingleNode {
+class OffloadPaimonScan extends OffloadSingleNode {
   override def offload(plan: SparkPlan): SparkPlan = plan match {
-    case scan: BatchScanExec
-        if nativeRead
-          && PaimonScanTransformer.supportsBatchScan(scan.scan)
-          && scan.output.isEmpty => scan
     case scan: BatchScanExec if PaimonScanTransformer.supportsBatchScan(scan.scan) =>
-      PaimonScanTransformer(scan, nativeRead, supportNativePkTableRead)
+      PaimonScanTransformer(scan)
     case other => other
   }
+}
+
+object OffloadPaimonScan {
+  def apply(): OffloadPaimonScan = new OffloadPaimonScan
 }

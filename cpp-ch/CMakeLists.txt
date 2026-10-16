@@ -172,27 +172,14 @@ endif()
 
 if(GLUTEN_USE_BUNDLED_PAIMON)
   # Ship the combined Paimon shared library next to libch.so for deployment.
-  set(_GLUTEN_BUNDLE_PAIMON_SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/bundle_paimon_libs.sh)
-  file(
-    WRITE ${_GLUTEN_BUNDLE_PAIMON_SCRIPT}
-    "#!/usr/bin/env bash
-set -euo pipefail
-mkdir -p '${LIBCH_OUTPUT_DIR}'
-for old_lib in '${LIBCH_OUTPUT_DIR}/libpaimon_'*.so* '${PAIMON_INSTALL_PREFIX}/lib/libpaimon_'*.so*; do
-  [ -e "\${old_lib}" ] || continue
-  rm -f "\${old_lib}"
-done
-cp -a '${PAIMON_INSTALL_PREFIX}/lib/libpaimon.so' '${LIBCH_OUTPUT_DIR}/'
-")
-  add_custom_command(
-    OUTPUT _bundle_paimon_libs
+  add_custom_target(bundle_paimon_libs
     COMMAND ${CMAKE_COMMAND} -E make_directory ${LIBCH_OUTPUT_DIR}
-    COMMAND chmod +x ${_GLUTEN_BUNDLE_PAIMON_SCRIPT}
-    COMMAND ${_GLUTEN_BUNDLE_PAIMON_SCRIPT}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${PAIMON_INSTALL_PREFIX}/lib/libpaimon.so ${LIBCH_OUTPUT_DIR}/libpaimon.so
     DEPENDS _build_ch
-    COMMENT "Copy libpaimon.so next to libch.so")
-  add_custom_target(bundle_paimon_libs DEPENDS _bundle_paimon_libs)
-  add_custom_target(build_ch ALL DEPENDS _build_ch bundle_paimon_libs)
+    COMMENT "Copy libpaimon.so next to libch.so"
+    VERBATIM)
+  add_custom_target(build_ch ALL DEPENDS bundle_paimon_libs)
 else()
   add_custom_target(build_ch ALL DEPENDS _build_ch)
 endif()

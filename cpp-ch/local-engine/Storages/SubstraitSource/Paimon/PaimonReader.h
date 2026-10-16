@@ -16,21 +16,10 @@
  */
 #pragma once
 
-#include <Storages/SubstraitSource/FileReader.h>
+#include <Storages/SubstraitSource/FormatFile.h>
 
 namespace local_engine::paimon
 {
-class PaimonReader final : public NormalFileReader
-{
-public:
-    static std::unique_ptr<PaimonReader> create(
-        const FormatFilePtr & file_, const DB::Block & to_read_header_, const DB::Block & output_header_);
-
-    PaimonReader(
-        const FormatFilePtr & file_,
-        const DB::Block & to_read_header_,
-        const DB::Block & output_header_,
-        const FormatFile::InputFormatPtr & input_format_);
-};
+FormatFile::InputFormatPtr createPaimonInputFormat(const FormatFile & file, const DB::Block & header);
 
 }

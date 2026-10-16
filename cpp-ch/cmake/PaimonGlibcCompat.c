@@ -15,6 +15,9 @@
  * limitations under the License.
  */
 
+/* Link-time wrappers for selected glibc calls in libpaimon.so. They bind math
+ * calls to older symbol versions and emulate pthread_cond_clockwait on older
+ * glibc releases; the getenv wrapper avoids a Bash startup symbol conflict. */
 #define _GNU_SOURCE
 
 #include <errno.h>

@@ -20,7 +20,7 @@
 
 namespace local_engine
 {
-/// Carries Substrait Paimon read options; actual IO is handled by paimon::PaimonReader in FileReader.
+/// Carries Substrait Paimon read options and creates the native input format.
 class PaimonFormatFile final : public FormatFile
 {
 public:
