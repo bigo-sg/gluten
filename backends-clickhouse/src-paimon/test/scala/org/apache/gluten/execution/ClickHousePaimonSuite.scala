@@ -81,6 +81,50 @@ class ClickHousePaimonSuite extends GlutenClickHouseWholeStageTransformerSuite {
     }
   }
 
+  test("sum one over append-only Paimon rows in ClickHouse") {
+    assume(sys.env.get("GLUTEN_TEST_NATIVE_PAIMON").contains("1"))
+    withTable("paimon_ch_native_sum_one") {
+      withSQLConf(GlutenConfig.GLUTEN_ENABLED.key -> "false") {
+        sql("CREATE TABLE paimon_ch_native_sum_one (id STRING, p STRING) USING paimon " +
+          "PARTITIONED BY (p) TBLPROPERTIES ('bucket'='-1', 'file.format'='parquet')")
+        sql("INSERT INTO paimon_ch_native_sum_one VALUES ('1', 'view'), " +
+          "(NULL, 'view'), ('3', 'click')")
+      }
+
+      withSQLConf(CHConfig.PAIMON_NATIVE_READ_ENABLED.key -> "true") {
+        runQueryAndCompare(
+          "SELECT sum(1) FROM paimon_ch_native_sum_one WHERE p = 'view'") { df =>
+          assert(df.collect().toSeq == Seq(Row(2L)))
+          assert(df.queryExecution.executedPlan.exists {
+            case _: CHPaimonScanTransformer => true
+            case _ => false
+          })
+        }
+        assert(sql("SELECT sum(1) FROM paimon_ch_native_sum_one WHERE p = 'missing'")
+          .collect().toSeq == Seq(Row(null)))
+      }
+    }
+  }
+
+  test("convert Paimon local count result to a CH batch") {
+    withTable("paimon_ch_local_count") {
+      withSQLConf(GlutenConfig.GLUTEN_ENABLED.key -> "false") {
+        sql("CREATE TABLE paimon_ch_local_count (id STRING, p STRING) USING paimon " +
+          "PARTITIONED BY (p) TBLPROPERTIES ('bucket'='-1', 'file.format'='parquet')")
+        sql("INSERT INTO paimon_ch_local_count VALUES ('1', 'view'), ('2', 'view')")
+      }
+
+      runQueryAndCompare(
+        "SELECT count(1) FROM paimon_ch_local_count WHERE p = 'view'") { df =>
+        assert(df.collect().toSeq == Seq(Row(2L)))
+        assert(df.queryExecution.executedPlan.exists {
+          case _: CHPaimonCountTransformer => true
+          case _ => false
+        })
+      }
+    }
+  }
+
   test("read partition columns from Paimon table with ClickHouse") {
     withTable("paimon_ch_partitioned") {
       withSQLConf(GlutenConfig.GLUTEN_ENABLED.key -> "false") {

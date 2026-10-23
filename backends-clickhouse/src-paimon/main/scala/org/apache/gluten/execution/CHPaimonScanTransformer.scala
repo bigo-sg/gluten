@@ -103,10 +103,6 @@ case class CHPaimonScanTransformer(
       case paimonScan: PaimonScan =>
         paimonScan.table match {
           case table: FileStoreTable =>
-            // A zero-column scan can reach Paimon's table-schema lookup through the virtual column.
-            if (output.isEmpty || getDataSchema.fields.isEmpty) {
-              return ValidationResult.failed("Native Paimon read requires a data column.")
-            }
             if (!allowPaimonCppPkRead && !table.primaryKeys().isEmpty) {
               return ValidationResult.failed("Not support Paimon PK table.")
             }

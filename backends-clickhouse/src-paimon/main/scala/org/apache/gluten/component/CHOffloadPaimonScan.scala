@@ -16,26 +16,31 @@
  */
 package org.apache.gluten.component
 
-import org.apache.gluten.execution.{CHPaimonScanTransformer, OffloadPaimonScan, PaimonScanTransformer}
+import org.apache.gluten.execution.{CHPaimonCountTransformer, CHPaimonScanTransformer, OffloadPaimonScan, PaimonScanTransformer}
 
-import org.apache.spark.sql.execution.SparkPlan
+import org.apache.spark.sql.execution.{LocalTableScanExec, SparkPlan}
 import org.apache.spark.sql.execution.datasources.v2.BatchScanExec
+import org.apache.spark.sql.execution.datasources.v2.DataSourceV2ScanRelation
+
+import org.apache.paimon.spark.read.PaimonLocalScan
 
 case class CHOffloadPaimonScan(
     usePaimonCppReader: Boolean,
     allowPaimonCppPkRead: Boolean)
   extends OffloadPaimonScan {
   override def offload(plan: SparkPlan): SparkPlan = {
-    if (!usePaimonCppReader) {
-      super.offload(plan)
-    } else {
-      plan match {
-        case scan: BatchScanExec
-            if PaimonScanTransformer.supportsBatchScan(scan.scan) && scan.output.isEmpty => scan
-        case scan: BatchScanExec if PaimonScanTransformer.supportsBatchScan(scan.scan) =>
-          CHPaimonScanTransformer(scan, allowPaimonCppPkRead)
-        case other => other
-      }
+    plan match {
+      case scan: LocalTableScanExec
+          if scan.logicalLink.exists(_.exists {
+            case relation: DataSourceV2ScanRelation =>
+              relation.scan.isInstanceOf[PaimonLocalScan]
+            case _ => false
+          }) => CHPaimonCountTransformer.replace(scan)
+      case scan: BatchScanExec
+          if usePaimonCppReader && PaimonScanTransformer.supportsBatchScan(scan.scan) =>
+        CHPaimonScanTransformer(scan, allowPaimonCppPkRead)
+      case other if !usePaimonCppReader => super.offload(other)
+      case other => other
     }
   }
 }
