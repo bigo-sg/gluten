@@ -84,17 +84,17 @@ execute_process(
 
 set(CH_BINARY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build")
 option(ENABLE_CPP_TEST "Build CPP Unit test" OFF)
+option(GLUTEN_ENABLE_NATIVE_PAIMON
+       "Build libch with native Paimon read support" ON)
 option(
-  GLUTEN_ENABLE_NATIVE_PAIMON
-  "Build libch with native Paimon read support"
-  OFF)
-option(GLUTEN_BUNDLE_PAIMON
-       "Download and build paimon-cpp into build/deps/paimon when Paimon_DIR is unset"
-       ON)
+  GLUTEN_BUNDLE_PAIMON
+  "Download and build paimon-cpp into build/deps/paimon when Paimon_DIR is unset"
+  ON)
 
 set(GLUTEN_USE_BUNDLED_PAIMON OFF)
 set(_GLUTEN_PAIMON_BUILD_DEP "")
-set(_GLUTEN_CH_CMAKE_PAIMON_ARG "-DGLUTEN_ENABLE_NATIVE_PAIMON=${GLUTEN_ENABLE_NATIVE_PAIMON}")
+set(_GLUTEN_CH_CMAKE_PAIMON_ARG
+    "-DGLUTEN_ENABLE_NATIVE_PAIMON=${GLUTEN_ENABLE_NATIVE_PAIMON}")
 
 if(GLUTEN_ENABLE_NATIVE_PAIMON)
   if(Paimon_DIR)
@@ -104,16 +104,16 @@ if(GLUTEN_ENABLE_NATIVE_PAIMON)
     include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/BuildPaimon.cmake)
     set(GLUTEN_USE_BUNDLED_PAIMON ON)
     message(
-      STATUS
-        "Bundled paimon-cpp will be installed to ${PAIMON_INSTALL_PREFIX}")
+      STATUS "Bundled paimon-cpp will be installed to ${PAIMON_INSTALL_PREFIX}")
   else()
     message(
       FATAL_ERROR
-        "Native Paimon requires paimon-cpp. Set -DPaimon_DIR=... or -DGLUTEN_BUNDLE_PAIMON=ON.")
+        "Native Paimon requires paimon-cpp. Set -DPaimon_DIR=... or -DGLUTEN_BUNDLE_PAIMON=ON."
+    )
   endif()
   if(GLUTEN_USE_BUNDLED_PAIMON)
-    # The bridge sources are compiled into libch.  Keep Paimon itself in
-    # shared libraries so its implementation is not copied into libch.
+    # The bridge sources are compiled into libch.  Keep Paimon itself in shared
+    # libraries so its implementation is not copied into libch.
     set(_GLUTEN_PAIMON_BUILD_DEP paimon_cpp)
     list(APPEND _GLUTEN_CH_CMAKE_PAIMON_ARG
          "-DPaimon_DIR=${GLUTEN_PAIMON_CMAKE_DIR}"
@@ -121,12 +121,14 @@ if(GLUTEN_ENABLE_NATIVE_PAIMON)
   else()
     message(
       FATAL_ERROR
-        "Native Paimon support requires bundled paimon-cpp (-DGLUTEN_BUNDLE_PAIMON=ON).")
+        "Native Paimon support requires bundled paimon-cpp (-DGLUTEN_BUNDLE_PAIMON=ON)."
+    )
   endif()
 else()
   message(
     STATUS
-      "GLUTEN_ENABLE_NATIVE_PAIMON=OFF: libch builds without paimon-cpp (raw Parquet Paimon scans only).")
+      "GLUTEN_ENABLE_NATIVE_PAIMON=OFF: libch builds without paimon-cpp (raw Parquet Paimon scans only)."
+  )
 endif()
 
 set(LIBCH_OUTPUT_DIR "${CH_BINARY_DIR}/utils/extern-local-engine")
@@ -161,8 +163,7 @@ else()
       -DENABLE_MYSQL=OFF -DENABLE_BCRYPT=OFF -DENABLE_LDAP=OFF
       -DENABLE_MSGPACK=OFF -DUSE_REPLXX=OFF -DENABLE_CLICKHOUSE_ALL=OFF
       -DENABLE_GWP_ASAN=OFF -DENABLE_NUMACTL=OFF -DENABLE_GOOGLE_CLOUD_CPP=OFF
-      -DENABLE_ARROW_FLIGHT=OFF -DENABLE_XRAY=0
-      ${_GLUTEN_CH_CMAKE_PAIMON_ARG}
+      -DENABLE_ARROW_FLIGHT=OFF -DENABLE_XRAY=0 ${_GLUTEN_CH_CMAKE_PAIMON_ARG}
       -DCOMPILER_FLAGS='-fvisibility=hidden -fvisibility-inlines-hidden' -S
       ${CH_SOURCE_DIR} -G Ninja -B ${CH_BINARY_DIR} && cmake --build
       ${CH_BINARY_DIR} --target libch\"
@@ -172,10 +173,12 @@ endif()
 
 if(GLUTEN_USE_BUNDLED_PAIMON)
   # Ship the combined Paimon shared library next to libch.so for deployment.
-  add_custom_target(bundle_paimon_libs
+  add_custom_target(
+    bundle_paimon_libs
     COMMAND ${CMAKE_COMMAND} -E make_directory ${LIBCH_OUTPUT_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${PAIMON_INSTALL_PREFIX}/lib/libpaimon.so ${LIBCH_OUTPUT_DIR}/libpaimon.so
+    COMMAND
+      ${CMAKE_COMMAND} -E copy_if_different
+      ${PAIMON_INSTALL_PREFIX}/lib/libpaimon.so ${LIBCH_OUTPUT_DIR}/libpaimon.so
     DEPENDS _build_ch
     COMMENT "Copy libpaimon.so next to libch.so"
     VERBATIM)

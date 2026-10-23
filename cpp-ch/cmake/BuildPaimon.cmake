@@ -28,14 +28,21 @@ set(PAIMON_GIT_TAG
     CACHE STRING "paimon-cpp git tag (must match find_package version 0.3.0)")
 
 string(REGEX REPLACE "[^A-Za-z0-9_.-]" "_" PAIMON_BUILD_TAG "${PAIMON_GIT_TAG}")
-set(PAIMON_EP_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build/deps/paimon-${PAIMON_BUILD_TAG}-src-upstream-arrow")
-set(PAIMON_EP_BINARY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build/deps/paimon-${PAIMON_BUILD_TAG}-build-upstream-arrow")
+set(PAIMON_EP_SOURCE_DIR
+    "${CMAKE_CURRENT_SOURCE_DIR}/build/deps/paimon-${PAIMON_BUILD_TAG}-src-upstream-arrow"
+)
+set(PAIMON_EP_BINARY_DIR
+    "${CMAKE_CURRENT_SOURCE_DIR}/build/deps/paimon-${PAIMON_BUILD_TAG}-build-upstream-arrow"
+)
 set(GLUTEN_PAIMON_LIBCXX_INCLUDE
-    "${CMAKE_CURRENT_SOURCE_DIR}/build/contrib/llvm-project/libcxx/include/c++/v1")
+    "${CMAKE_CURRENT_SOURCE_DIR}/build/contrib/llvm-project/libcxx/include/c++/v1"
+)
 set(GLUTEN_PAIMON_LIBCXX_SOURCE_INCLUDE
-    "${CMAKE_CURRENT_SOURCE_DIR}/ClickHouse/contrib/llvm-project/libcxx/include")
+    "${CMAKE_CURRENT_SOURCE_DIR}/ClickHouse/contrib/llvm-project/libcxx/include"
+)
 set(GLUTEN_PAIMON_LIBCXXABI_INCLUDE
-    "${CMAKE_CURRENT_SOURCE_DIR}/ClickHouse/contrib/llvm-project/libcxxabi/include")
+    "${CMAKE_CURRENT_SOURCE_DIR}/ClickHouse/contrib/llvm-project/libcxxabi/include"
+)
 set(GLUTEN_PAIMON_LIBCXX_ARCHIVE
     "${CMAKE_CURRENT_SOURCE_DIR}/build/contrib/libcxx-cmake/libcxx.a")
 set(GLUTEN_PAIMON_LIBCXXABI_ARCHIVE
@@ -45,23 +52,29 @@ set(GLUTEN_PAIMON_LIBUNWIND_ARCHIVE
 # Prefer Paimon's bundled Arrow and fmt headers over system installations;
 # ClickHouse supplies only the libc++ runtime and uses its own Arrow build.
 set(GLUTEN_PAIMON_CXX_FLAGS
-    "-stdlib=libc++ -fuse-ld=lld -nostdlib++ -nostdinc++ -I${PAIMON_EP_BINARY_DIR}/arrow_ep-install/include -I${PAIMON_EP_BINARY_DIR}/fmt_ep-install/include -isystem ${GLUTEN_PAIMON_LIBCXX_INCLUDE} -isystem ${GLUTEN_PAIMON_LIBCXX_SOURCE_INCLUDE} -isystem ${GLUTEN_PAIMON_LIBCXXABI_INCLUDE} -include cstdlib")
+    "-stdlib=libc++ -fuse-ld=lld -nostdlib++ -nostdinc++ -I${PAIMON_EP_BINARY_DIR}/arrow_ep-install/include -I${PAIMON_EP_BINARY_DIR}/fmt_ep-install/include -isystem ${GLUTEN_PAIMON_LIBCXX_INCLUDE} -isystem ${GLUTEN_PAIMON_LIBCXX_SOURCE_INCLUDE} -isystem ${GLUTEN_PAIMON_LIBCXXABI_INCLUDE} -include cstdlib"
+)
 set(GLUTEN_PAIMON_CXX_STANDARD_LIBRARIES
-    "${GLUTEN_PAIMON_LIBCXX_ARCHIVE} ${GLUTEN_PAIMON_LIBCXXABI_ARCHIVE} ${GLUTEN_PAIMON_LIBUNWIND_ARCHIVE} -ldl -pthread -lm")
+    "${GLUTEN_PAIMON_LIBCXX_ARCHIVE} ${GLUTEN_PAIMON_LIBCXXABI_ARCHIVE} ${GLUTEN_PAIMON_LIBUNWIND_ARCHIVE} -ldl -pthread -lm"
+)
 if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   message(FATAL_ERROR "Native Paimon requires Clang to build with libc++")
 endif()
-if(NOT EXISTS "${GLUTEN_PAIMON_LIBCXX_INCLUDE}/__config_site" OR
-   NOT EXISTS "${GLUTEN_PAIMON_LIBCXX_SOURCE_INCLUDE}/string" OR
-   NOT EXISTS "${GLUTEN_PAIMON_LIBCXXABI_INCLUDE}/cxxabi.h")
-  message(FATAL_ERROR "Build ClickHouse libc++ before native Paimon: ${GLUTEN_PAIMON_LIBCXX_INCLUDE}")
+if(NOT EXISTS "${GLUTEN_PAIMON_LIBCXX_INCLUDE}/__config_site"
+   OR NOT EXISTS "${GLUTEN_PAIMON_LIBCXX_SOURCE_INCLUDE}/string"
+   OR NOT EXISTS "${GLUTEN_PAIMON_LIBCXXABI_INCLUDE}/cxxabi.h")
+  message(
+    FATAL_ERROR
+      "Build ClickHouse libc++ before native Paimon: ${GLUTEN_PAIMON_LIBCXX_INCLUDE}"
+  )
 endif()
-foreach(_runtime IN ITEMS
-    GLUTEN_PAIMON_LIBCXX_ARCHIVE
-    GLUTEN_PAIMON_LIBCXXABI_ARCHIVE
-    GLUTEN_PAIMON_LIBUNWIND_ARCHIVE)
+foreach(_runtime IN
+        ITEMS GLUTEN_PAIMON_LIBCXX_ARCHIVE GLUTEN_PAIMON_LIBCXXABI_ARCHIVE
+              GLUTEN_PAIMON_LIBUNWIND_ARCHIVE)
   if(NOT EXISTS "${${_runtime}}")
-    message(FATAL_ERROR "Build ClickHouse C++ runtime before native Paimon: ${${_runtime}}")
+    message(
+      FATAL_ERROR
+        "Build ClickHouse C++ runtime before native Paimon: ${${_runtime}}")
   endif()
 endforeach()
 
