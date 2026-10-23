@@ -82,6 +82,9 @@ class VeloxConfig(conf: SQLConf) extends GlutenConfig(conf) {
   def veloxOrcScanEnabled: Boolean =
     getConf(VELOX_ORC_SCAN_ENABLED)
 
+  def scanMapKeyPruningEnabled: Boolean =
+    getConf(SCAN_MAP_KEY_PRUNING_ENABLED)
+
   def floatingPointMode: String = getConf(FLOATING_POINT_MODE)
 
   def enableRewriteCastArrayToString: Boolean =
@@ -246,6 +249,16 @@ object VeloxConfig extends ConfigRegistry {
       .intConf
       .createOptional
 
+  val COLUMNAR_VELOX_BROADCAST_HASH_TABLE_BUILD_THREADS =
+    buildStaticConf("spark.gluten.sql.columnar.backend.velox.broadcastHashTableBuildThreads")
+      .doc(
+        "Size of the dedicated CPU thread pool for the parallel broadcast hash-table build. " +
+          "By default, the thread pool is sized to the maximum task slots per Spark executor " +
+          "on executors, or to spark.driver.cores on the driver (used when " +
+          "driver-side broadcast hash-table build is enabled), with a minimum of one thread.")
+      .intConf
+      .createOptional
+
   val COLUMNAR_VELOX_BROADCAST_HASH_TABLE_BUILD_TARGET_BYTES =
     buildStaticConf("spark.gluten.velox.broadcast.build.targetBytesPerThread")
       .doc(
@@ -278,6 +291,17 @@ object VeloxConfig extends ConfigRegistry {
       .doc("The split preload per task")
       .intConf
       .createWithDefault(2)
+
+  val SCAN_MAP_KEY_PRUNING_ENABLED =
+    buildConf("spark.gluten.sql.columnar.backend.velox.scanMapKeyPruningEnabled")
+      .doc(
+        "When true, a map column read by a native Parquet scan is declared to Velox with only " +
+          "the constant keys the query looks up (m['k'], element_at(m, 'k'), null checks), so " +
+          "the reader skips the other entries. Applies when every use of the map sits in the " +
+          "filters and projections directly above the scan and the map is dropped before any " +
+          "other operator sees it; otherwise the map is read whole. See ScanMapKeyPruning.")
+      .booleanConf
+      .createWithDefault(false)
 
   val COLUMNAR_VELOX_GLOG_VERBOSE_LEVEL =
     buildConf("spark.gluten.sql.columnar.backend.velox.glogVerboseLevel")
@@ -1017,9 +1041,10 @@ object VeloxConfig extends ConfigRegistry {
   val ENABLE_TIMESTAMP_NTZ_VALIDATION =
     buildConf("spark.gluten.sql.columnar.backend.velox.enableTimestampNtzValidation")
       .doc(
-        "Enable validation fallback for TimestampNTZ type. When true, any plan " +
-          "containing TimestampNTZ will fall back to Spark execution. When false, " +
-          "allows native execution for TimestampNTZ scan.")
+        "Enable validation fallback for TimestampNTZ type. When true, plans with " +
+          "TimestampNTZ in their input or output schemas fall back to Spark execution. " +
+          "When false, supported TimestampNTZ operations are eligible for native execution, " +
+          "subject to other validation rules.")
       .booleanConf
       .createWithDefault(false)
 

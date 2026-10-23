@@ -30,6 +30,12 @@ import java.util.Locale
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
+object JoinAggregateTwoStageMode extends Enumeration {
+  // TODO: Support ALL at existing shuffle boundaries; splitting below joins can otherwise
+  //  introduce unnecessary shuffles, especially for broadcast hash joins.
+  val NONE, FINAL = Value
+}
+
 trait ShuffleWriterType {
   val name: String
   val requiresResizingShuffleInput: Boolean
@@ -157,6 +163,12 @@ class GlutenConfig(conf: SQLConf) extends GlutenCoreConfig(conf) {
 
   def pushAggregateThroughJoinMaxDepth: Int =
     getConf(PUSH_AGGREGATE_THROUGH_JOIN_MAX_DEPTH)
+
+  def pushAggregateThroughJoinPartialMergeEnabled: Boolean =
+    getConf(PUSH_AGGREGATE_THROUGH_JOIN_PARTIAL_MERGE_ENABLED)
+
+  def pushAggregateThroughJoinTwoStageMode: JoinAggregateTwoStageMode.Value =
+    getConf(PUSH_AGGREGATE_THROUGH_JOIN_TWO_STAGE_MODE)
 
   def forceOrcCharTypeScanFallbackEnabled: Boolean =
     getConf(VELOX_FORCE_ORC_CHAR_TYPE_SCAN_FALLBACK)
@@ -783,6 +795,20 @@ object GlutenConfig extends ConfigRegistry {
       .intConf
       .checkValue(_ >= 1, "must be greater than or equal to 1.")
       .createWithDefault(Int.MaxValue)
+
+  val PUSH_AGGREGATE_THROUGH_JOIN_PARTIAL_MERGE_ENABLED =
+    buildConf("spark.gluten.sql.pushAggregateThroughJoin.partialMerge.enabled")
+      .doc("Retains local partial merges between joins crossed by aggregate pushdown.")
+      .booleanConf
+      .createWithDefault(false)
+
+  val PUSH_AGGREGATE_THROUGH_JOIN_TWO_STAGE_MODE =
+    buildConf("spark.gluten.sql.pushAggregateThroughJoin.twoStage.mode")
+      .doc(
+        "Controls physical staging of the final join aggregate: NONE uses a single final " +
+          "stage; FINAL adds a local partial merge before the final aggregation exchange.")
+      .enumConf(JoinAggregateTwoStageMode)
+      .createWithDefault(JoinAggregateTwoStageMode.NONE)
 
   val GLUTEN_SOFT_AFFINITY_ENABLED =
     buildConf("spark.gluten.soft-affinity.enabled")
