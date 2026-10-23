@@ -209,7 +209,7 @@ links it against a separate shared
 host needs libc++ development headers and libraries for the selected Clang
 version. The libc++, libc++abi, and libunwind runtimes are linked statically
 into `libpaimon.so`. With `-DGLUTEN_ENABLE_NATIVE_PAIMON=ON` (the default),
-the wrapper CMake builds
+the wrapper CMake first builds ClickHouse's libc++ runtime, then builds
 paimon-cpp with its file-system and format components in one `libpaimon.so`,
 copies that library next to `libch.so`, and sets
 `RPATH` to `$ORIGIN` for loading. Rebuild the native backend before building
