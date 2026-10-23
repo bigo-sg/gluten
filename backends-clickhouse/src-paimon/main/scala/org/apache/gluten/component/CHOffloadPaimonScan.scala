@@ -24,10 +24,7 @@ import org.apache.spark.sql.execution.datasources.v2.DataSourceV2ScanRelation
 
 import org.apache.paimon.spark.read.PaimonLocalScan
 
-case class CHOffloadPaimonScan(
-    usePaimonCppReader: Boolean,
-    allowPaimonCppPkRead: Boolean)
-  extends OffloadPaimonScan {
+case object CHOffloadPaimonScan extends OffloadPaimonScan {
   override def offload(plan: SparkPlan): SparkPlan = {
     plan match {
       case scan: LocalTableScanExec
@@ -36,10 +33,8 @@ case class CHOffloadPaimonScan(
               relation.scan.isInstanceOf[PaimonLocalScan]
             case _ => false
           }) => CHPaimonCountTransformer.replace(scan)
-      case scan: BatchScanExec
-          if usePaimonCppReader && PaimonScanTransformer.supportsBatchScan(scan.scan) =>
-        CHPaimonScanTransformer(scan, allowPaimonCppPkRead)
-      case other if !usePaimonCppReader => super.offload(other)
+      case scan: BatchScanExec if PaimonScanTransformer.supportsBatchScan(scan.scan) =>
+        CHPaimonScanTransformer(scan)
       case other => other
     }
   }

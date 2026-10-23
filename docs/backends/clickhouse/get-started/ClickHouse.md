@@ -200,10 +200,8 @@ spark.sql.catalog.paimon=org.apache.paimon.spark.SparkCatalog
 spark.sql.catalog.paimon.warehouse=file:///path/to/paimon-warehouse
 ```
 
-Paimon plans the file splits in Spark. Gluten sends the raw Parquet or ORC file
-splits to the ClickHouse native file reader, which executes the scan. This is
-file-level acceleration, not a native Paimon reader: primary-key tables and
-deletion vectors are not offloaded by the raw-file path.
+Paimon plans the file splits in Spark. Gluten passes serialized splits to the
+ClickHouse native Paimon reader, including for primary-key tables.
 
 A native reader uses the Paimon C++ API from `libch.so` and
 links it against a separate shared
@@ -215,18 +213,14 @@ into `libpaimon.so`. With `-DGLUTEN_ENABLE_NATIVE_PAIMON=ON` (default in
 paimon-cpp with its file-system and format components in one `libpaimon.so`,
 copies that library next to `libch.so`, and sets
 `RPATH` to `$ORIGIN` for loading. Rebuild the native backend before building
-the JVM modules, then set
-`spark.gluten.sql.columnar.backend.ch.paimon.native.read.enabled=true`. This
-passes serialized Paimon splits to the C++ reader instead of converting them to
-raw Parquet/ORC files. The reader requests only the columns required by the
+the JVM modules. Gluten passes serialized Paimon splits to the C++ reader by
+default. The reader requests only the columns required by the
 query. For HDFS tables, configure
 `spark.gluten.sql.columnar.backend.ch.runtime_config.hdfs.libhdfs3_conf`
 with the HDFS site XML on every executor. The optional
 `spark.gluten.sql.columnar.backend.ch.runtime_config.paimon.read_batch_size=8192`
 sets the Paimon C++ reader batch size; when omitted, the SDK default applies.
-Primary-key tables use Spark Paimon reads by default.
-To opt in to native primary-key reads, also set
-`spark.gluten.sql.columnar.backend.ch.paimon.native.pk.read.enabled=true`.
+Primary-key tables use the native Paimon reader by default.
 Ship `libch.so` and `libpaimon.so` on every executor.
 The bundled `libpaimon.so` binds the math functions used by Paimon to their
 original glibc versions and provides a fallback for `pthread_cond_clockwait`.

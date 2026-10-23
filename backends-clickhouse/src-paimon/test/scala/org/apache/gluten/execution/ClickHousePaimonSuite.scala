@@ -16,12 +16,10 @@
  */
 package org.apache.gluten.execution
 
-import org.apache.gluten.backendsapi.clickhouse.CHConfig
 import org.apache.gluten.config.GlutenConfig
 
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.{DataFrame, Row}
-import org.apache.spark.sql.execution.datasources.v2.BatchScanExec
 
 class ClickHousePaimonSuite extends GlutenClickHouseWholeStageTransformerSuite {
   override protected def sparkConf: SparkConf = {
@@ -46,6 +44,7 @@ class ClickHousePaimonSuite extends GlutenClickHouseWholeStageTransformerSuite {
 
   Seq("parquet", "orc").foreach { format =>
     test(s"read Paimon $format table with ClickHouse") {
+      assume(sys.env.get("GLUTEN_TEST_NATIVE_PAIMON").contains("1"))
       withTable("paimon_ch_table") {
         withSQLConf(GlutenConfig.GLUTEN_ENABLED.key -> "false") {
           sql(s"CREATE TABLE paimon_ch_table (id INT, name STRING) USING paimon " +
@@ -68,15 +67,12 @@ class ClickHousePaimonSuite extends GlutenClickHouseWholeStageTransformerSuite {
         sql("INSERT INTO paimon_ch_native_read VALUES (1, 'Bob'), (2, 'Alice')")
       }
 
-      withSQLConf(
-        "spark.gluten.sql.columnar.backend.ch.paimon.native.read.enabled" -> "true") {
-        runQueryAndCompare("SELECT id, name FROM paimon_ch_native_read ORDER BY id") { df =>
-          checkNativePaimonScan(df)
-          assert(df.queryExecution.executedPlan.exists {
-            case _: CHPaimonScanTransformer => true
-            case _ => false
-          })
-        }
+      runQueryAndCompare("SELECT id, name FROM paimon_ch_native_read ORDER BY id") { df =>
+        checkNativePaimonScan(df)
+        assert(df.queryExecution.executedPlan.exists {
+          case _: CHPaimonScanTransformer => true
+          case _ => false
+        })
       }
     }
   }
@@ -91,18 +87,16 @@ class ClickHousePaimonSuite extends GlutenClickHouseWholeStageTransformerSuite {
           "(NULL, 'view'), ('3', 'click')")
       }
 
-      withSQLConf(CHConfig.PAIMON_NATIVE_READ_ENABLED.key -> "true") {
-        runQueryAndCompare(
-          "SELECT sum(1) FROM paimon_ch_native_sum_one WHERE p = 'view'") { df =>
-          assert(df.collect().toSeq == Seq(Row(2L)))
-          assert(df.queryExecution.executedPlan.exists {
-            case _: CHPaimonScanTransformer => true
-            case _ => false
-          })
-        }
-        assert(sql("SELECT sum(1) FROM paimon_ch_native_sum_one WHERE p = 'missing'")
-          .collect().toSeq == Seq(Row(null)))
+      runQueryAndCompare(
+        "SELECT sum(1) FROM paimon_ch_native_sum_one WHERE p = 'view'") { df =>
+        assert(df.collect().toSeq == Seq(Row(2L)))
+        assert(df.queryExecution.executedPlan.exists {
+          case _: CHPaimonScanTransformer => true
+          case _ => false
+        })
       }
+      assert(sql("SELECT sum(1) FROM paimon_ch_native_sum_one WHERE p = 'missing'")
+        .collect().toSeq == Seq(Row(null)))
     }
   }
 
@@ -126,6 +120,7 @@ class ClickHousePaimonSuite extends GlutenClickHouseWholeStageTransformerSuite {
   }
 
   test("read partition columns from Paimon table with ClickHouse") {
+    assume(sys.env.get("GLUTEN_TEST_NATIVE_PAIMON").contains("1"))
     withTable("paimon_ch_partitioned") {
       withSQLConf(GlutenConfig.GLUTEN_ENABLED.key -> "false") {
         sql("CREATE TABLE paimon_ch_partitioned (id INT, p STRING) " +
@@ -138,33 +133,7 @@ class ClickHousePaimonSuite extends GlutenClickHouseWholeStageTransformerSuite {
     }
   }
 
-  test("fall back to Paimon scan for primary key table regardless of native read setting") {
-    withTable("paimon_ch_pk") {
-      withSQLConf(GlutenConfig.GLUTEN_ENABLED.key -> "false") {
-        sql("CREATE TABLE paimon_ch_pk (id INT, name STRING) USING paimon " +
-          "TBLPROPERTIES ('primary-key'='id', 'bucket'='1', " +
-          "'file.format'='parquet', 'write-only'='true')")
-        sql("INSERT INTO paimon_ch_pk VALUES (1, 'old')")
-        sql("INSERT INTO paimon_ch_pk VALUES (1, 'new')")
-      }
-
-      Seq("false", "true").foreach { nativeRead =>
-        withSQLConf(
-          "spark.gluten.sql.columnar.backend.ch.paimon.native.read.enabled" -> nativeRead) {
-          runQueryAndCompare("SELECT id, name FROM paimon_ch_pk") { df =>
-            assert(df.collect().toSeq == Seq(Row(1, "new")))
-            assert(!df.queryExecution.executedPlan.exists {
-              case _: PaimonScanTransformer | _: CHPaimonScanTransformer => true
-              case _ => false
-            })
-            assert(df.queryExecution.executedPlan.exists(_.isInstanceOf[BatchScanExec]))
-          }
-        }
-      }
-    }
-  }
-
-  test("offload primary key table when native Paimon primary-key read is enabled") {
+  test("offload primary key table by default") {
     assume(sys.env.get("GLUTEN_TEST_NATIVE_PAIMON").contains("1"))
     withTable("paimon_ch_native_pk") {
       withSQLConf(GlutenConfig.GLUTEN_ENABLED.key -> "false") {
@@ -175,17 +144,13 @@ class ClickHousePaimonSuite extends GlutenClickHouseWholeStageTransformerSuite {
         sql("INSERT INTO paimon_ch_native_pk VALUES (1, 'new')")
       }
 
-      withSQLConf(
-        "spark.gluten.sql.columnar.backend.ch.paimon.native.read.enabled" -> "true",
-        CHConfig.PAIMON_NATIVE_PK_READ_ENABLED.key -> "true") {
-        runQueryAndCompare("SELECT id, name FROM paimon_ch_native_pk") { df =>
-          assert(df.collect().toSeq == Seq(Row(1, "new")))
-          checkNativePaimonScan(df)
-          assert(df.queryExecution.executedPlan.exists {
-            case _: CHPaimonScanTransformer => true
-            case _ => false
-          })
-        }
+      runQueryAndCompare("SELECT id, name FROM paimon_ch_native_pk") { df =>
+        assert(df.collect().toSeq == Seq(Row(1, "new")))
+        checkNativePaimonScan(df)
+        assert(df.queryExecution.executedPlan.exists {
+          case _: CHPaimonScanTransformer => true
+          case _ => false
+        })
       }
     }
   }
@@ -203,15 +168,11 @@ class ClickHousePaimonSuite extends GlutenClickHouseWholeStageTransformerSuite {
         sql("INSERT INTO paimon_ch_native_pk_count VALUES (2, 'click', 'other')")
       }
 
-      withSQLConf(
-        "spark.gluten.sql.columnar.backend.ch.paimon.native.read.enabled" -> "true",
-        CHConfig.PAIMON_NATIVE_PK_READ_ENABLED.key -> "true") {
-        Seq("COUNT(id)", "COUNT(*)").foreach { count =>
-          runQueryAndCompare(
-            s"SELECT $count FROM paimon_ch_native_pk_count WHERE p = 'view'") { df =>
-            assert(df.collect().toSeq == Seq(Row(1L)))
-            checkNativePaimonScan(df)
-          }
+      Seq("COUNT(id)", "COUNT(*)").foreach { count =>
+        runQueryAndCompare(
+          s"SELECT $count FROM paimon_ch_native_pk_count WHERE p = 'view'") { df =>
+          assert(df.collect().toSeq == Seq(Row(1L)))
+          checkNativePaimonScan(df)
         }
       }
     }

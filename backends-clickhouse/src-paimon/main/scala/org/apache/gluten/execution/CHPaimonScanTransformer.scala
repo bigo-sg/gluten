@@ -47,8 +47,7 @@ case class CHPaimonScanTransformer(
     @transient override val table: Table,
     override val keyGroupedPartitioning: Option[Seq[Expression]] = None,
     override val commonPartitionValues: Option[Seq[(InternalRow, Int)]] = None,
-    override val pushDownFilters: Option[Seq[Expression]] = None,
-    allowPaimonCppPkRead: Boolean = false)
+    override val pushDownFilters: Option[Seq[Expression]] = None)
   extends BatchScanExecTransformerBase(
     output = output,
     scan = scan,
@@ -102,10 +101,8 @@ case class CHPaimonScanTransformer(
     scan match {
       case paimonScan: PaimonScan =>
         paimonScan.table match {
-          case table: FileStoreTable =>
-            if (!allowPaimonCppPkRead && !table.primaryKeys().isEmpty) {
-              return ValidationResult.failed("Not support Paimon PK table.")
-            }
+          case _: FileStoreTable =>
+            ()
           case table =>
             return ValidationResult.failed(
               s"Not support Paimon ${table.getClass.getSimpleName} table.")
@@ -162,16 +159,13 @@ case class CHPaimonScanTransformer(
 }
 
 object CHPaimonScanTransformer {
-  def apply(
-      batchScan: BatchScanExec,
-      allowPaimonCppPkRead: Boolean): CHPaimonScanTransformer = {
+  def apply(batchScan: BatchScanExec): CHPaimonScanTransformer = {
     new CHPaimonScanTransformer(
       batchScan.output,
       batchScan.scan,
       batchScan.runtimeFilters,
       table = batchScan.table,
       keyGroupedPartitioning = batchScan.keyGroupedPartitioning,
-      commonPartitionValues = SparkShimLoader.getSparkShims.getCommonPartitionValues(batchScan),
-      allowPaimonCppPkRead = allowPaimonCppPkRead)
+      commonPartitionValues = SparkShimLoader.getSparkShims.getCommonPartitionValues(batchScan))
   }
 }

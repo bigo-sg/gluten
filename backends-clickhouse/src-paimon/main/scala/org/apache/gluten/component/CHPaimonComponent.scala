@@ -16,7 +16,7 @@
  */
 package org.apache.gluten.component
 
-import org.apache.gluten.backendsapi.clickhouse.{CHBackend, CHConfig}
+import org.apache.gluten.backendsapi.clickhouse.CHBackend
 import org.apache.gluten.config.GlutenConfig
 import org.apache.gluten.extension.columnar.heuristic.HeuristicTransform
 import org.apache.gluten.extension.columnar.validator.Validators
@@ -36,13 +36,7 @@ class CHPaimonComponent extends Component {
 
   override def injectRules(injector: Injector): Unit = {
     injector.gluten.legacy.injectTransform { c =>
-      val chConfig = new CHConfig(c.sqlConf)
-      val usePaimonCppReader = chConfig.paimonNativeReadEnabled
-      val allowPaimonCppPkRead = chConfig.paimonNativePkReadEnabled
-      val offload = Seq(
-        CHOffloadPaimonScan(
-          usePaimonCppReader = usePaimonCppReader,
-          allowPaimonCppPkRead = allowPaimonCppPkRead))
+      val offload = Seq(CHOffloadPaimonScan)
       HeuristicTransform.Simple(
         Validators.newValidator(new GlutenConfig(c.sqlConf), offload),
         offload)
