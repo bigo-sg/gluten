@@ -142,4 +142,15 @@ ExternalProject_Add(
   USES_TERMINAL_BUILD ON
   UPDATE_DISCONNECTED TRUE)
 
+# Paimon's object libraries include headers installed by these ExternalProject
+# targets, but its build graph does not wait for their install steps. Build the
+# bundled dependencies before compiling Paimon in a parallel build.
+ExternalProject_Add_Step(
+  paimon_cpp prepare_dependencies
+  COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --target arrow_ep avro_ep fmt_ep
+          glog_ep orc_ep protobuf_ep rapidjson_ep tbb_ep --parallel
+  DEPENDEES configure
+  DEPENDERS build
+  USES_TERMINAL TRUE)
+
 set(GLUTEN_PAIMON_CMAKE_DIR "${PAIMON_INSTALL_PREFIX}/lib/cmake/Paimon")
