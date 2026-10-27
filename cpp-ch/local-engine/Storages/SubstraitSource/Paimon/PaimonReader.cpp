@@ -221,9 +221,9 @@ FormatFile::InputFormatPtr createPaimonInputFormat(const FormatFile & file, cons
     if (!file_info.has_paimon())
         throw DB::Exception(DB::ErrorCodes::LOGICAL_ERROR, "Paimon input format requires paimon read options in LocalFiles");
 
-    const auto & paimon_options = file_info.paimon();
-    const auto & serialized_split = paimon_options.serialized_split();
-    const auto & table_path = paimon_options.table_path();
+    const auto & cpp_split = file_info.paimon().cpp_split();
+    const auto & serialized_split = cpp_split.serialized_data_split();
+    const auto & table_path = cpp_split.table_path();
 
     LOG_INFO(
         &Poco::Logger::get("PaimonReader"),
@@ -234,6 +234,7 @@ FormatFile::InputFormatPtr createPaimonInputFormat(const FormatFile & file, cons
     auto split = takeResult(::paimon::Split::Deserialize(
         serialized_split.data(), serialized_split.size(), ::paimon::GetDefaultPool()));
     ::paimon::ReadContextBuilder builder(table_path);
+    builder.WithBranch(cpp_split.branch());
     const bool count_only = header.columns() == 1 && header.has(BlockUtil::VIRTUAL_ROW_COUNT_COLUMN);
     std::vector<std::string> read_fields;
     read_fields.reserve(header.columns());

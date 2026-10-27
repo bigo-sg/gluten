@@ -21,8 +21,12 @@ import java.util.Map;
 
 public class PaimonLocalFilesBuilder {
   public static PaimonLocalFilesNode makeNativePaimonLocalFiles(
-      Integer index, String tablePath, List<byte[]> splits, List<String> preferredLocations) {
-    return new PaimonLocalFilesNode(index, tablePath, splits, preferredLocations);
+      Integer index,
+      String tablePath,
+      String branch,
+      List<byte[]> splits,
+      List<String> preferredLocations) {
+    return new PaimonLocalFilesNode(index, tablePath, branch, splits, preferredLocations);
   }
 
   public static PaimonLocalFilesNode makePaimonLocalFiles(

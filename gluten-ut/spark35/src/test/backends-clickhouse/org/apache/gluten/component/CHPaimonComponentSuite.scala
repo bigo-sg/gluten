@@ -16,7 +16,11 @@
  */
 package org.apache.gluten.component
 
+import org.apache.gluten.substrait.rel.PaimonLocalFilesBuilder
+
 import org.scalatest.funsuite.AnyFunSuite
+
+import scala.collection.JavaConverters._
 
 class CHPaimonComponentSuite extends AnyFunSuite {
   test("Paimon component declares the ClickHouse backend dependency") {
@@ -26,5 +30,17 @@ class CHPaimonComponentSuite extends AnyFunSuite {
     assert(loader.loadClass(component).getDeclaredConstructor().newInstance()
       .asInstanceOf[Component].dependencies().contains(
         classOf[org.apache.gluten.backendsapi.clickhouse.CHBackend]))
+  }
+
+  test("Paimon C++ split carries branch") {
+    val node = PaimonLocalFilesBuilder.makeNativePaimonLocalFiles(
+      0,
+      "file:///tmp/paimon-table",
+      "review_branch",
+      Seq(Array[Byte](1)).asJava,
+      Seq.empty[String].asJava)
+    val cppSplit = node.toProtobuf.getItems(0).getPaimon.getCppSplit
+    assert(cppSplit.getBranch == "review_branch")
+    assert(cppSplit.getSerializedDataSplit.toByteArray.toSeq == Seq[Byte](1))
   }
 }

@@ -35,7 +35,7 @@ import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.paimon.CoreOptions
 import org.apache.paimon.io.DataOutputSerializer
 import org.apache.paimon.spark.{PaimonInputPartition, PaimonScan}
-import org.apache.paimon.table.{DataTable, FileStoreTable}
+import org.apache.paimon.table.FileStoreTable
 import org.apache.paimon.table.source.DataSplit
 
 import scala.collection.JavaConverters._
@@ -57,14 +57,16 @@ case class CHPaimonScanTransformer(
     commonPartitionValues = commonPartitionValues
   ) {
 
-  private lazy val coreOptions: CoreOptions = scan match {
+  private lazy val paimonScanTable: FileStoreTable = scan match {
     case paimonScan: PaimonScan =>
       paimonScan.table match {
-        case dataTable: DataTable => dataTable.coreOptions()
+        case dataTable: FileStoreTable => dataTable
         case _ => throw new GlutenNotSupportException("Only support Paimon DataTable.")
       }
     case _ => throw new GlutenNotSupportException("Only support PaimonScan.")
   }
+
+  private lazy val coreOptions: CoreOptions = paimonScanTable.coreOptions()
 
   override def getPartitionSchema: StructType = scan match {
     case paimonScan: PaimonScan =>
@@ -102,7 +104,9 @@ case class CHPaimonScanTransformer(
       case paimonScan: PaimonScan =>
         paimonScan.table match {
           case _: FileStoreTable =>
-            ()
+            if (!paimonScan.inputSplits.forall(_.isInstanceOf[DataSplit])) {
+              return ValidationResult.failed("Native Paimon reader only supports DataSplit.")
+            }
           case table =>
             return ValidationResult.failed(
               s"Not support Paimon ${table.getClass.getSimpleName} table.")
@@ -135,6 +139,7 @@ case class CHPaimonScanTransformer(
           val node = PaimonLocalFilesBuilder.makeNativePaimonLocalFiles(
             p.index,
             coreOptions.path().toString,
+            coreOptions.branch(),
             splits.asJava,
             p.preferredLocations().toList.asJava)
           node.setFileSchema(getDataSchema)

@@ -16,7 +16,8 @@
  */
 package org.apache.gluten.component
 
-import org.apache.gluten.execution.{CHPaimonCountTransformer, CHPaimonScanTransformer, OffloadPaimonScan, PaimonScanTransformer}
+import org.apache.gluten.execution.{CHPaimonCountTransformer, CHPaimonScanTransformer, PaimonScanTransformer}
+import org.apache.gluten.extension.columnar.offload.OffloadSingleNode
 
 import org.apache.spark.sql.execution.{LocalTableScanExec, SparkPlan}
 import org.apache.spark.sql.execution.datasources.v2.BatchScanExec
@@ -24,7 +25,7 @@ import org.apache.spark.sql.execution.datasources.v2.DataSourceV2ScanRelation
 
 import org.apache.paimon.spark.read.PaimonLocalScan
 
-case object CHOffloadPaimonScan extends OffloadPaimonScan {
+case object CHOffloadPaimonScan extends OffloadSingleNode {
   override def offload(plan: SparkPlan): SparkPlan = {
     plan match {
       case scan: LocalTableScanExec

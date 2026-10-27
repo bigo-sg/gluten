@@ -20,11 +20,13 @@ import com.google.protobuf.ByteString;
 import io.substrait.proto.ReadRel;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
 public class PaimonLocalFilesNode extends LocalFilesNode {
   private final List<byte[]> serializedSplits;
+  private final String branch;
 
   public PaimonLocalFilesNode(
       Integer index,
@@ -49,33 +51,44 @@ public class PaimonLocalFilesNode extends LocalFilesNode {
         properties,
         new ArrayList<>());
     this.serializedSplits = null;
+    this.branch = null;
   }
 
   public PaimonLocalFilesNode(
-      Integer index, String tablePath, List<byte[]> splits, List<String> preferredLocations) {
+      Integer index,
+      String tablePath,
+      String branch,
+      List<byte[]> splits,
+      List<String> preferredLocations) {
     super(
         index,
-        java.util.Collections.nCopies(splits.size(), tablePath),
-        java.util.Collections.nCopies(splits.size(), 0L),
-        java.util.Collections.nCopies(splits.size(), 1L),
+        Collections.nCopies(splits.size(), tablePath),
+        Collections.nCopies(splits.size(), 0L),
+        Collections.nCopies(splits.size(), 1L),
         new ArrayList<>(),
         new ArrayList<>(),
-        java.util.Collections.nCopies(splits.size(), java.util.Collections.emptyMap()),
+        Collections.nCopies(splits.size(), Collections.emptyMap()),
         new ArrayList<>(),
         ReadFileFormat.UnknownFormat,
         preferredLocations,
-        java.util.Collections.emptyMap(),
+        Collections.emptyMap(),
         new ArrayList<>());
     this.serializedSplits = splits;
+    this.branch = branch;
   }
 
   @Override
   protected void processFileBuilder(ReadRel.LocalFiles.FileOrFiles.Builder fileBuilder, int index) {
     if (serializedSplits != null) {
+      ReadRel.LocalFiles.FileOrFiles.PaimonReadOptions.PaimonCppSplit cppSplit =
+          ReadRel.LocalFiles.FileOrFiles.PaimonReadOptions.PaimonCppSplit.newBuilder()
+              .setTablePath(getPaths().get(index))
+              .setSerializedDataSplit(ByteString.copyFrom(serializedSplits.get(index)))
+              .setBranch(branch)
+              .build();
       fileBuilder.setPaimon(
           ReadRel.LocalFiles.FileOrFiles.PaimonReadOptions.newBuilder()
-              .setTablePath(getPaths().get(index))
-              .setSerializedSplit(ByteString.copyFrom(serializedSplits.get(index)))
+              .setCppSplit(cppSplit)
               .build());
     }
   }

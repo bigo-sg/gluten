@@ -32,10 +32,11 @@ PaimonFormatFile::PaimonFormatFile(
     DB::ContextPtr context, const substrait::ReadRel::LocalFiles::FileOrFiles & file, const ReadBufferBuilderPtr & read_buffer_builder)
     : FormatFile(context, file, read_buffer_builder)
 {
-    if (!file.has_paimon() || file.paimon().table_path().empty() || file.paimon().serialized_split().empty())
+    if (!file.has_paimon() || !file.paimon().has_cpp_split() || file.paimon().cpp_split().table_path().empty()
+        || file.paimon().cpp_split().serialized_data_split().empty())
         throw DB::Exception(
             DB::ErrorCodes::BAD_ARGUMENTS,
-            "Paimon native read requires table_path and serialized_split in substrait LocalFiles");
+            "Paimon native read requires table_path and serialized_data_split in substrait LocalFiles");
 }
 
 FormatFile::InputFormatPtr PaimonFormatFile::createInputFormat(

@@ -77,6 +77,59 @@ class ClickHousePaimonSuite extends GlutenClickHouseWholeStageTransformerSuite {
     }
   }
 
+  test("native Paimon scan preserves branch") {
+    assume(sys.env.get("GLUTEN_TEST_NATIVE_PAIMON").contains("1"))
+    withTable("paimon_ch_branch") {
+      withSQLConf(GlutenConfig.GLUTEN_ENABLED.key -> "false") {
+        sql("CREATE TABLE paimon_ch_branch (id INT) USING paimon " +
+          "TBLPROPERTIES ('bucket'='-1', 'file.format'='parquet')")
+        sql("INSERT INTO paimon_ch_branch VALUES (1)")
+        sql("CALL sys.create_tag('default.paimon_ch_branch', 'review_tag')")
+        sql("CALL sys.create_branch('default.paimon_ch_branch', 'review_branch', 'review_tag')")
+        sql("INSERT INTO paimon_ch_branch VALUES (2)")
+      }
+
+      val path = s"file://$dataHome/data-paimon/default.db/paimon_ch_branch"
+      def readBranch(): DataFrame = spark.read.format("paimon")
+        .option("path", path)
+        .option("branch", "review_branch")
+        .load()
+      withSQLConf(GlutenConfig.GLUTEN_ENABLED.key -> "false") {
+        assert(readBranch().collect().toSeq == Seq(Row(1)))
+      }
+      val df = readBranch()
+      assert(df.collect().toSeq == Seq(Row(1)))
+      val nativeScans = df.queryExecution.executedPlan.collect {
+        case scan: CHPaimonScanTransformer => scan
+      }
+      assert(nativeScans.nonEmpty, df.queryExecution.executedPlan.toString())
+    }
+  }
+
+  test("incremental diff scan falls back to Paimon JVM reader") {
+    withTable("paimon_ch_incremental_fallback") {
+      withSQLConf(GlutenConfig.GLUTEN_ENABLED.key -> "false") {
+        sql("CREATE TABLE paimon_ch_incremental_fallback " +
+          "(id INT, name STRING) USING paimon " +
+          "TBLPROPERTIES ('primary-key'='id', 'bucket'='1', 'file.format'='parquet')")
+        sql("INSERT INTO paimon_ch_incremental_fallback VALUES (1, 'old')")
+        sql("INSERT INTO paimon_ch_incremental_fallback VALUES (1, 'new')")
+      }
+
+      val path = s"file://$dataHome/data-paimon/default.db/paimon_ch_incremental_fallback"
+      val df = spark.read.format("paimon")
+        .option("path", path)
+        .option("incremental-between", "1,2")
+        .option("incremental-between-scan-mode", "diff")
+        .load()
+      assert(df.collect().toSeq == Seq(Row(1, "new")))
+      assert(!df.queryExecution.executedPlan.exists {
+        case _: CHPaimonScanTransformer => true
+        case _ => false
+      })
+    }
+  }
+
   test("sum one over append-only Paimon rows in ClickHouse") {
     assume(sys.env.get("GLUTEN_TEST_NATIVE_PAIMON").contains("1"))
     withTable("paimon_ch_native_sum_one") {
