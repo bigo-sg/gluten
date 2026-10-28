@@ -82,10 +82,15 @@ function(gluten_paimon_sysroot_flags)
   set(GLUTEN_PAIMON_SYSROOT
       "${CMAKE_SYSROOT}"
       PARENT_SCOPE)
-  # The sysroot does not ship libgcc_s. Use Clang's builtins and the explicitly
-  # linked ClickHouse libunwind instead of the host GCC runtime.
+  set(GLUTEN_PAIMON_BUILTINS_ARCHIVE
+      "${CH_BINARY_DIR}/clang-builtins/lib/linux/libclang_rt.builtins-${_processor}.a"
+      PARENT_SCOPE)
+  # Do not let Clang locate runtime libraries in its system resource directory:
+  # CI may have Clang installed without compiler-rt. ClickHouse builds these
+  # builtins before Paimon is configured. Forward them in the compiler flags so
+  # nested dependency builds (including C-only executables) use them too.
   set(GLUTEN_PAIMON_SYSROOT_FLAGS
-      "--target=${CMAKE_CXX_COMPILER_TARGET} --sysroot=${CMAKE_SYSROOT} --gcc-toolchain=${TOOLCHAIN_PATH} -fuse-ld=lld --rtlib=compiler-rt --unwindlib=none"
+      "--target=${CMAKE_CXX_COMPILER_TARGET} --sysroot=${CMAKE_SYSROOT} --gcc-toolchain=${TOOLCHAIN_PATH} -fuse-ld=lld -nodefaultlibs -Wl,--start-group,${CH_BINARY_DIR}/clang-builtins/lib/linux/libclang_rt.builtins-${_processor}.a,${CH_BINARY_DIR}/contrib/libunwind-cmake/libunwind.a,--end-group -lc -lm -lpthread -ldl"
       PARENT_SCOPE)
 endfunction()
 gluten_paimon_sysroot_flags()
@@ -106,8 +111,11 @@ set(GLUTEN_PAIMON_LIBUNWIND_ARCHIVE
     "${CMAKE_CURRENT_SOURCE_DIR}/build/contrib/libunwind-cmake/libunwind.a")
 # Prefer Paimon's bundled Arrow and fmt headers over system installations;
 # ClickHouse supplies only the libc++ runtime and uses its own Arrow build.
+# Match ClickHouse's modified std::exception layout. This flag must also reach
+# every bundled C++ dependency through Paimon's EP_CXX_FLAGS; otherwise runtime
+# constructors write past the smaller exception objects allocated by callers.
 set(GLUTEN_PAIMON_CXX_FLAGS
-    "${GLUTEN_PAIMON_SYSROOT_FLAGS} -stdlib=libc++ -nostdlib++ -nostdinc++ -I${PAIMON_EP_BINARY_DIR}/arrow_ep-install/include -I${PAIMON_EP_BINARY_DIR}/fmt_ep-install/include -isystem ${GLUTEN_PAIMON_LIBCXX_INCLUDE} -isystem ${GLUTEN_PAIMON_LIBCXX_SOURCE_INCLUDE} -isystem ${GLUTEN_PAIMON_LIBCXXABI_INCLUDE} -include cstdlib"
+    "${GLUTEN_PAIMON_SYSROOT_FLAGS} -DSTD_EXCEPTION_HAS_STACK_TRACE=1 -stdlib=libc++ -nostdlib++ -nostdinc++ -I${PAIMON_EP_BINARY_DIR}/arrow_ep-install/include -I${PAIMON_EP_BINARY_DIR}/fmt_ep-install/include -isystem ${GLUTEN_PAIMON_LIBCXX_INCLUDE} -isystem ${GLUTEN_PAIMON_LIBCXX_SOURCE_INCLUDE} -isystem ${GLUTEN_PAIMON_LIBCXXABI_INCLUDE} -include cstdlib"
 )
 set(GLUTEN_PAIMON_CXX_STANDARD_LIBRARIES
     "${GLUTEN_PAIMON_LIBCXX_ARCHIVE} ${GLUTEN_PAIMON_LIBCXXABI_ARCHIVE} ${GLUTEN_PAIMON_LIBUNWIND_ARCHIVE} -ldl -pthread -lm"
@@ -134,7 +142,7 @@ add_custom_target(
     -DENABLE_MYSQL=OFF -DENABLE_BCRYPT=OFF -DENABLE_LDAP=OFF
     -DENABLE_MSGPACK=OFF -DUSE_REPLXX=OFF -DENABLE_CLICKHOUSE_ALL=OFF
     -DENABLE_GWP_ASAN=OFF -DENABLE_NUMACTL=OFF -DENABLE_GOOGLE_CLOUD_CPP=OFF
-    -DENABLE_ARROW_FLIGHT=OFF -DENABLE_XRAY=0
+    -DENABLE_ARROW_FLIGHT=OFF -DENABLE_XRAY=0 -DUSE_SYSTEM_COMPILER_RT=OFF
     "-DCOMPILER_FLAGS=-fvisibility=hidden -fvisibility-inlines-hidden"
   COMMAND ${CMAKE_COMMAND} --build ${CH_BINARY_DIR} --target cxx
   COMMAND
@@ -144,6 +152,7 @@ add_custom_target(
     -DGLUTEN_PAIMON_LIBCXXABI_INCLUDE=${GLUTEN_PAIMON_LIBCXXABI_INCLUDE}
     -DGLUTEN_PAIMON_LIBCXX_ARCHIVE=${GLUTEN_PAIMON_LIBCXX_ARCHIVE}
     -DGLUTEN_PAIMON_LIBCXXABI_ARCHIVE=${GLUTEN_PAIMON_LIBCXXABI_ARCHIVE}
+    -DGLUTEN_PAIMON_BUILTINS_ARCHIVE=${GLUTEN_PAIMON_BUILTINS_ARCHIVE}
     -DGLUTEN_PAIMON_LIBUNWIND_ARCHIVE=${GLUTEN_PAIMON_LIBUNWIND_ARCHIVE} -P
     ${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckPaimonLibcxx.cmake
   USES_TERMINAL VERBATIM)
