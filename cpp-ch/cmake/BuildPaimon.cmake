@@ -177,3 +177,26 @@ ExternalProject_Add_Step(
   USES_TERMINAL TRUE)
 
 set(GLUTEN_PAIMON_CMAKE_DIR "${PAIMON_INSTALL_PREFIX}/lib/cmake/Paimon")
+
+# Register after the caller defines the libch build command and output directory.
+function(gluten_bundle_paimon_libs libch_output_dir deployment_dir)
+  # Ship the combined Paimon shared library next to libch.so for deployment.
+  add_custom_target(
+    bundle_paimon_libs
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${libch_output_dir}
+    COMMAND
+      ${CMAKE_COMMAND} -E copy_if_different
+      ${PAIMON_INSTALL_PREFIX}/lib/libpaimon.so ${libch_output_dir}/libpaimon.so
+    # Jenkins removes cpp-ch after copying libch.so to the repository root.
+    # Preserve both runtime libraries there before the build tree is removed.
+    COMMAND
+      ${CMAKE_COMMAND} -E copy_if_different
+      ${libch_output_dir}/libch.so ${deployment_dir}/libch.so
+    COMMAND
+      ${CMAKE_COMMAND} -E copy_if_different
+      ${libch_output_dir}/libpaimon.so
+      ${deployment_dir}/libpaimon.so
+    DEPENDS _build_ch
+    COMMENT "Copy libch.so and libpaimon.so for deployment"
+    VERBATIM)
+endfunction()

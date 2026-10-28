@@ -172,16 +172,7 @@ else()
 endif()
 
 if(GLUTEN_USE_BUNDLED_PAIMON)
-  # Ship the combined Paimon shared library next to libch.so for deployment.
-  add_custom_target(
-    bundle_paimon_libs
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${LIBCH_OUTPUT_DIR}
-    COMMAND
-      ${CMAKE_COMMAND} -E copy_if_different
-      ${PAIMON_INSTALL_PREFIX}/lib/libpaimon.so ${LIBCH_OUTPUT_DIR}/libpaimon.so
-    DEPENDS _build_ch
-    COMMENT "Copy libpaimon.so next to libch.so"
-    VERBATIM)
+  gluten_bundle_paimon_libs("${LIBCH_OUTPUT_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/..")
   add_custom_target(build_ch ALL DEPENDS bundle_paimon_libs)
 else()
   add_custom_target(build_ch ALL DEPENDS _build_ch)
