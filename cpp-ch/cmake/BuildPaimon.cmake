@@ -17,6 +17,29 @@
 # Use ClickHouse's libc++ runtime while keeping Paimon's own Arrow dependency.
 include(ExternalProject)
 
+# Paimon's bundled Arrow patch is applied with GNU patch. Some CI builder
+# images do not include it, while the build container has apt available.
+find_program(GLUTEN_PATCH_EXECUTABLE patch)
+if(NOT GLUTEN_PATCH_EXECUTABLE)
+  execute_process(
+    COMMAND apt-get update
+    RESULT_VARIABLE _patch_apt_update_result)
+  if(NOT _patch_apt_update_result EQUAL 0)
+    message(FATAL_ERROR "GNU patch is required to build Paimon, and apt-get update failed")
+  endif()
+  execute_process(
+    COMMAND apt-get install -y patch
+    RESULT_VARIABLE _patch_apt_install_result)
+  if(NOT _patch_apt_install_result EQUAL 0)
+    message(FATAL_ERROR "GNU patch is required to build Paimon, and apt-get install failed")
+  endif()
+  unset(GLUTEN_PATCH_EXECUTABLE CACHE)
+  find_program(GLUTEN_PATCH_EXECUTABLE patch)
+endif()
+if(NOT GLUTEN_PATCH_EXECUTABLE)
+  message(FATAL_ERROR "GNU patch is required to build Paimon")
+endif()
+
 set(PAIMON_INSTALL_PREFIX
     "${CMAKE_CURRENT_SOURCE_DIR}/build/deps/paimon"
     CACHE PATH "Install prefix for bundled paimon-cpp")
