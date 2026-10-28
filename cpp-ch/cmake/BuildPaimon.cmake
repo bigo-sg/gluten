@@ -17,21 +17,23 @@
 # Use ClickHouse's libc++ runtime while keeping Paimon's own Arrow dependency.
 include(ExternalProject)
 
-# Paimon's bundled Arrow patch is applied with GNU patch. Some CI builder
-# images do not include it, while the build container has apt available.
+# Paimon's bundled Arrow patch is applied with GNU patch. Some CI builder images
+# do not include it, while the build container has apt available.
 find_program(GLUTEN_PATCH_EXECUTABLE patch)
 if(NOT GLUTEN_PATCH_EXECUTABLE)
-  execute_process(
-    COMMAND apt-get update
-    RESULT_VARIABLE _patch_apt_update_result)
+  execute_process(COMMAND apt-get update
+                  RESULT_VARIABLE _patch_apt_update_result)
   if(NOT _patch_apt_update_result EQUAL 0)
-    message(FATAL_ERROR "GNU patch is required to build Paimon, and apt-get update failed")
+    message(
+      FATAL_ERROR
+        "GNU patch is required to build Paimon, and apt-get update failed")
   endif()
-  execute_process(
-    COMMAND apt-get install -y patch
-    RESULT_VARIABLE _patch_apt_install_result)
+  execute_process(COMMAND apt-get install -y patch
+                  RESULT_VARIABLE _patch_apt_install_result)
   if(NOT _patch_apt_install_result EQUAL 0)
-    message(FATAL_ERROR "GNU patch is required to build Paimon, and apt-get install failed")
+    message(
+      FATAL_ERROR
+        "GNU patch is required to build Paimon, and apt-get install failed")
   endif()
   unset(GLUTEN_PATCH_EXECUTABLE CACHE)
   find_program(GLUTEN_PATCH_EXECUTABLE patch)
@@ -55,8 +57,38 @@ set(PAIMON_EP_SOURCE_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}/build/deps/paimon-${PAIMON_BUILD_TAG}-src-upstream-arrow"
 )
 set(PAIMON_EP_BINARY_DIR
-    "${CMAKE_CURRENT_SOURCE_DIR}/build/deps/paimon-${PAIMON_BUILD_TAG}-build-upstream-arrow"
+    "${CMAKE_CURRENT_SOURCE_DIR}/build/deps/paimon-${PAIMON_BUILD_TAG}-build-upstream-arrow-sysroot"
 )
+# Read ClickHouse's toolchain in a function so its settings do not change the
+# outer Gluten build. Keep the sysroot in the compiler flags as well: Paimon and
+# Arrow forward C/CXX flags to their nested ExternalProject dependencies, but do
+# not forward CMAKE_SYSROOT or CMAKE_TOOLCHAIN_FILE.
+function(gluten_paimon_sysroot_flags)
+  string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" _processor)
+  if(_processor MATCHES "^(amd64|x86_64)$")
+    set(_processor x86_64)
+  elseif(_processor MATCHES "^(arm64|aarch64)$")
+    set(_processor aarch64)
+  else()
+    message(
+      FATAL_ERROR "Unsupported Paimon sysroot architecture: ${_processor}")
+  endif()
+  set(_toolchain "${CH_SOURCE_DIR}/cmake/linux/toolchain-${_processor}.cmake")
+  include("${_toolchain}")
+  if(NOT EXISTS "${CMAKE_SYSROOT}/usr/include/stdlib.h")
+    message(
+      FATAL_ERROR "ClickHouse sysroot is not initialized: ${CMAKE_SYSROOT}")
+  endif()
+  set(GLUTEN_PAIMON_SYSROOT
+      "${CMAKE_SYSROOT}"
+      PARENT_SCOPE)
+  # The sysroot does not ship libgcc_s. Use Clang's builtins and the explicitly
+  # linked ClickHouse libunwind instead of the host GCC runtime.
+  set(GLUTEN_PAIMON_SYSROOT_FLAGS
+      "--target=${CMAKE_CXX_COMPILER_TARGET} --sysroot=${CMAKE_SYSROOT} --gcc-toolchain=${TOOLCHAIN_PATH} -fuse-ld=lld --rtlib=compiler-rt --unwindlib=none"
+      PARENT_SCOPE)
+endfunction()
+gluten_paimon_sysroot_flags()
 set(GLUTEN_PAIMON_LIBCXX_INCLUDE
     "${CMAKE_CURRENT_SOURCE_DIR}/build/contrib/llvm-project/libcxx/include/c++/v1"
 )
@@ -75,7 +107,7 @@ set(GLUTEN_PAIMON_LIBUNWIND_ARCHIVE
 # Prefer Paimon's bundled Arrow and fmt headers over system installations;
 # ClickHouse supplies only the libc++ runtime and uses its own Arrow build.
 set(GLUTEN_PAIMON_CXX_FLAGS
-    "-stdlib=libc++ -fuse-ld=lld -nostdlib++ -nostdinc++ -I${PAIMON_EP_BINARY_DIR}/arrow_ep-install/include -I${PAIMON_EP_BINARY_DIR}/fmt_ep-install/include -isystem ${GLUTEN_PAIMON_LIBCXX_INCLUDE} -isystem ${GLUTEN_PAIMON_LIBCXX_SOURCE_INCLUDE} -isystem ${GLUTEN_PAIMON_LIBCXXABI_INCLUDE} -include cstdlib"
+    "${GLUTEN_PAIMON_SYSROOT_FLAGS} -stdlib=libc++ -nostdlib++ -nostdinc++ -I${PAIMON_EP_BINARY_DIR}/arrow_ep-install/include -I${PAIMON_EP_BINARY_DIR}/fmt_ep-install/include -isystem ${GLUTEN_PAIMON_LIBCXX_INCLUDE} -isystem ${GLUTEN_PAIMON_LIBCXX_SOURCE_INCLUDE} -isystem ${GLUTEN_PAIMON_LIBCXXABI_INCLUDE} -include cstdlib"
 )
 set(GLUTEN_PAIMON_CXX_STANDARD_LIBRARIES
     "${GLUTEN_PAIMON_LIBCXX_ARCHIVE} ${GLUTEN_PAIMON_LIBCXXABI_ARCHIVE} ${GLUTEN_PAIMON_LIBUNWIND_ARCHIVE} -ldl -pthread -lm"
@@ -132,6 +164,8 @@ ExternalProject_Add(
     -DCMAKE_INSTALL_PREFIX=${PAIMON_INSTALL_PREFIX}
     -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
     -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+    -DCMAKE_SYSROOT=${GLUTEN_PAIMON_SYSROOT}
+    -DCMAKE_C_FLAGS=${GLUTEN_PAIMON_SYSROOT_FLAGS}
     -DCMAKE_CXX_FLAGS=${GLUTEN_PAIMON_CXX_FLAGS}
     -DCMAKE_CXX_STANDARD_LIBRARIES=${GLUTEN_PAIMON_CXX_STANDARD_LIBRARIES}
     -DGLUTEN_PAIMON_LIBCXX_ARCHIVE=${GLUTEN_PAIMON_LIBCXX_ARCHIVE}
@@ -178,7 +212,8 @@ ExternalProject_Add_Step(
 
 set(GLUTEN_PAIMON_CMAKE_DIR "${PAIMON_INSTALL_PREFIX}/lib/cmake/Paimon")
 
-# Register after the caller defines the libch build command and output directory.
+# Register after the caller defines the libch build command and output
+# directory.
 function(gluten_bundle_paimon_libs libch_output_dir deployment_dir)
   # Ship the combined Paimon shared library next to libch.so for deployment.
   add_custom_target(
@@ -189,13 +224,10 @@ function(gluten_bundle_paimon_libs libch_output_dir deployment_dir)
       ${PAIMON_INSTALL_PREFIX}/lib/libpaimon.so ${libch_output_dir}/libpaimon.so
     # Jenkins removes cpp-ch after copying libch.so to the repository root.
     # Preserve both runtime libraries there before the build tree is removed.
-    COMMAND
-      ${CMAKE_COMMAND} -E copy_if_different
-      ${libch_output_dir}/libch.so ${deployment_dir}/libch.so
-    COMMAND
-      ${CMAKE_COMMAND} -E copy_if_different
-      ${libch_output_dir}/libpaimon.so
-      ${deployment_dir}/libpaimon.so
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${libch_output_dir}/libch.so
+            ${deployment_dir}/libch.so
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${libch_output_dir}/libpaimon.so ${deployment_dir}/libpaimon.so
     DEPENDS _build_ch
     COMMENT "Copy libch.so and libpaimon.so for deployment"
     VERBATIM)
